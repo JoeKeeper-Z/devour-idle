@@ -195,6 +195,11 @@ body{
   </div>
 
   <div class="panel">
+    <h3>联动 <span class="hint" id="synHint">0 / 6 已激活</span></h3>
+    <div id="synList"></div>
+  </div>
+
+  <div class="panel">
     <h3>属性</h3>
     <div class="row"><span class="k">攻击力</span><span class="v" id="sAtk">5</span></div>
     <div class="row"><span class="k">生命</span><span class="v" id="sHp">50 / 50</span></div>
@@ -387,6 +392,28 @@ const EVENTS = [
   {id:'raid',      name:'掠夺', icon:'⚔️', desc:'本层怪物攻击 ×1.5，精华 ×1.8',   mod:{atk:1.5, ess:1.8}},
 ];
 
+// ============================================================
+// 技能联动：状态 → 兑现 → 增幅
+// need = 必须"已吞噬"的技能（增幅层不占槽位）
+// ----------
+const SYNERGY = [
+  {id:'corrode', chain:'毒蚀', icon:'☠', name:'腐蚀',
+   need:['venom','rend'], desc:'裂爪命中中毒目标：伤害 +60%，并挂「裂伤」4 秒',
+   amp:['crush'], ampDesc:'持有碎骨：裂伤延长到 6 秒'},
+  {id:'linkage', chain:'毒蚀', icon:'🔗', name:'碎链',
+   need:['rend','triple'], desc:'连斩命中「裂伤」目标：每段伤害 +50%'},
+  {id:'edge', chain:'毒蚀', icon:'✨', name:'锐意',
+   need:['triple','crush'], desc:'连斩打掉裂伤后 3 秒内，碎骨伤害 ×2 且不再自损'},
+  {id:'bulwark', chain:'坚壁', icon:'🛡', name:'坚壁',
+   need:['harden','ironwall'], desc:'护盾存在时施放铁壁：减伤提升到 70%，并反弹下一次攻击'},
+  {id:'selfheal', chain:'坚壁', icon:'🩸', name:'自愈',
+   need:['ironwall','bloodthirst'], desc:'铁壁期间嗜血：回血翻倍，并立刻刷新硬化冷却'},
+  {id:'storm', chain:'疾风', icon:'⚡', name:'疾风连段',
+   need:['haste','triple'], desc:'疾风期间连斩：段数 3 → 5'},
+];
+function synActive(sy){ return sy.need.every(function(k){ return S.skills.indexOf(k) >= 0; }); }
+function synAmp(sy){ return !!(sy.amp && sy.amp.every(function(k){ return S.skills.indexOf(k) >= 0; })); }
+
 const KILLS_PER_TRAIT = 10;
 const SLOT_UNLOCK = [4, 7];
 const SAVE_KEY = 'devour_idle_v3';
@@ -427,6 +454,7 @@ const R = {
   fightId:0, slKey:'', reviveAt:0,
   paused:false, evOpts:[], evUntil:0,
   regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0, affixSuppress:false,
+  lacUntil:0, rushUntil:0, armorStrong:false, reflectNext:false,
   killGate:0,               // 自动推进：本层已杀多少只
   dead:false,
 };
@@ -550,6 +578,7 @@ function startFight(){
   R.monTimer = 0; R.atkTimer = 0; R.atkCount = 0;
   R.shield = 0;
   R.regenTimer = 0; R.meBurnUntil = 0; R.meBurnAcc = 0;
+  R.lacUntil = 0; R.rushUntil = 0; R.armorStrong = false; R.reflectNext = false;
   R.fightStart = now(); R.fightSkillUses = 0;
   R.fightId++;
   render();
@@ -755,7 +784,8 @@ function monsterAttack(){
   let raw = m.atk;
   // 狂暴：自身残血时攻击翻倍
   if(aff.indexOf('enrage') >= 0 && R.monHp / Math.max(1,R.monHpMax) < 0.35) raw *= 2;
-  let dmg = raw * (now() < R.armorUntil ? 0.5 : 1);
+  const armorOn = now() < R.armorUntil;
+  let dmg = raw * (armorOn ? (R.armorStrong ? 0.3 : 0.5) : 1);
   dmg = Math.max(1, Math.round(dmg));
   // 吸血：攻击后回复自身生命
   if(aff.indexOf('leech') >= 0 && R.monHp > 0){
@@ -773,6 +803,11 @@ function monsterAttack(){
     if(ab > 0) floatDmg('盾 -' + ab, 'skill');
   }
   if(dmg > 0) S.hp -= dmg;
+  // 坚壁反弹：铁壁期间第一次挨打，原样反射回去
+  if(armorOn && R.reflectNext){
+    R.reflectNext = false;
+    damageMonster(Math.round(raw * 0.5), '反弹');
+  }
 
   if(S.hp <= 0){
     S.hp = 0; R.dead = true;
@@ -796,35 +831,66 @@ function castSkill(id){
   const D = derived();
   const sk = SKILLS[id];
   const m = curMon();
-  R.cds[id] = now() + sk.cd;
+  const cdCut = (S.skills.indexOf('soul') >= 0) ? 0.9 : 1;   // 噬魂增幅
+  R.cds[id] = now() + sk.cd * cdCut;
   R.fightSkillUses++;
 
   if(id === 'harden'){
     R.shield += Math.round(D.hpMax*0.2);
   } else if(id === 'bloodthirst'){
-    const heal = Math.round(D.hpMax*0.1);
+    let heal = Math.round(D.hpMax*0.1);
+    const sh = SYNERGY.find(function(x){ return x.id==='selfheal'; });
+    if(synActive(sh) && now() < R.armorUntil){
+      heal *= 2;
+      R.cds['harden'] = 0;               // 刷新硬化
+    }
     S.hp = Math.min(D.hpMax, S.hp + heal);
     floatDmg('+' + heal, 'skill');
   } else if(id === 'haste'){
     R.hasteUntil = now() + 5000;
   } else if(id === 'rend'){
-    damageMonster(Math.round(D.atk*2.2), '裂爪');
+    let dmg = D.atk*2.2;
+    let tag = '裂爪';
+    const poisoned = now() < R.poisonUntil;
+    const corrode = SYNERGY.find(function(x){ return x.id==='corrode'; });
+    if(poisoned && synActive(corrode)){ dmg *= 1.6; tag = '腐蚀裂爪'; }
+    // 挂裂伤（碎骨在场则延长）
+    const lacMs = (synActive(corrode) && synAmp(corrode)) ? 6000 : 4000;
+    if(poisoned && synActive(corrode)) R.lacUntil = now() + lacMs;
+    damageMonster(Math.round(dmg), tag);
   } else if(id === 'venom'){
     R.poisonUntil = now() + 6000; R.poisonDps = Math.max(1, Math.round(D.atk*0.3));
   } else if(id === 'ironwall'){
     R.armorUntil = now() + 5000;
+    const bw = SYNERGY.find(function(x){ return x.id==='bulwark'; });
+    if(synActive(bw) && R.shield > 0){ R.armorStrong = true; R.reflectNext = true; }
   } else if(id === 'triple'){
-    (function(fid){
-      for(let i=0;i<3;i++){
+    const lac = now() < R.lacUntil;
+    const linkage = synActive(SYNERGY.find(function(x){ return x.id==='linkage'; }));
+    const storm = synActive(SYNERGY.find(function(x){ return x.id==='storm'; }));
+    let hits = (storm && now() < R.hasteUntil) ? 5 : 3;
+    let per = D.atk*0.6;
+    let tag = '连斩';
+    if(lac && linkage){ per *= 1.5; tag = '碎链连斩'; }
+    if(lac){ R.lacUntil = 0; R.rushUntil = now() + 3000; }
+    (function(fid, hits, per, tag){
+      for(let i=0;i<hits;i++){
         setTimeout(function(){
           if(fid !== R.fightId) return;
-          if(R.monHp > 0) damageMonster(Math.round(D.atk*0.6), '连斩');
+          if(R.monHp > 0) damageMonster(Math.round(per), tag);
         }, i*130);
       }
-    })(R.fightId);
+    })(R.fightId, hits, per, tag);
   } else if(id === 'crush'){
-    damageMonster(Math.round(D.atk*3.0), '碎骨');
-    if(S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
+    let dmg = D.atk*3.0;
+    let tag = '碎骨';
+    const exe = SYNERGY.find(function(x){ return x.id==='edge'; });
+    const rush = synActive(exe) && now() < R.rushUntil;
+    if(rush){ dmg *= 2; tag = '锐意碎骨'; }
+    // 增幅：持有裂爪 → 碎骨必暴
+    if(S.skills.indexOf('rend') >= 0){ dmg *= D.critDmg; tag += '·暴'; }
+    damageMonster(Math.round(dmg), tag);
+    if(!rush && S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
   } else if(id === 'soul'){
     const g = Math.round(m.ess*3*D.essMul);
     S.ess += g;
@@ -1043,6 +1109,34 @@ function render(){
         '<div class="sinfo"><div class="sname">' + sk.name + '</div>' +
         '<div class="scond">' + CONDS[s.cond].label + '</div></div><div class="sarrow">›</div></div>';
     }).join('');
+  }
+
+  // 联动面板
+  const synList = document.getElementById('synList');
+  const synKey = S.skills.join(',');
+  if(synList.dataset.k !== synKey){
+    synList.dataset.k = synKey;
+    let on = 0;
+    synList.innerHTML = SYNERGY.map(function(sy){
+      const act = synActive(sy);
+      if(act) on++;
+      const amps = (sy.amp || []).filter(function(k){ return S.skills.indexOf(k) >= 0; });
+      const ampLine = (sy.amp && sy.amp.length)
+        ? '<div class="scond" style="color:' + (amps.length ? '#a7e3bd' : '#4a5a6d') + '">' +
+          (amps.length ? '▲ ' : '△ ') + sy.ampDesc + '</div>' : '';
+      const missing = sy.need.filter(function(k){ return S.skills.indexOf(k) < 0; })
+        .map(function(k){ return SKILLS[k].name; }).join('、');
+      return '<div class="slot' + (act ? '' : ' locked') + '" style="cursor:default">' +
+        '<div class="sicon">' + sy.icon + '</div>' +
+        '<div class="sinfo">' +
+          '<div class="sname" style="color:' + (act ? '#c4a5ff' : '#44566b') + '">' +
+            sy.chain + ' · ' + sy.name + '</div>' +
+          '<div class="scond">' + sy.desc + '</div>' + ampLine +
+          (act ? '' : '<div class="scond" style="color:#5a6b80">缺：' + missing + '</div>') +
+        '</div></div>';
+    }).join('');
+    const hint = document.getElementById('synHint');
+    if(hint) hint.textContent = on + ' / ' + SYNERGY.length + ' 已激活';
   }
 
   document.getElementById('sAtk').textContent = fmt(D.atk);
