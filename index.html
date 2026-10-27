@@ -274,8 +274,13 @@ const R = {
   hasteUntil:0, armorUntil:0, poisonUntil:0, poisonDps:0, poisonAcc:0,
   cds:{},
   fightStart:0, fightSkillUses:0,
+  fightId:0, slKey:'',
   dead:false,
 };
+
+// 脏标记：渲染合并到最多每 80ms 一次，避免每次都重建 DOM 造成卡顿
+let dirty = true, lastRender = 0;
+function markDirty(){ dirty = true; }
 
 function curMon(){
   const f = FLOORS[S.floorIdx], m = f.monsters[S.monIdx];
@@ -347,13 +352,15 @@ function startFight(){
   R.monTimer = 0; R.atkTimer = 0; R.atkCount = 0;
   R.shield = 0;
   R.fightStart = now(); R.fightSkillUses = 0;
-  render();
+  R.fightId++;
+  render(); dirty = false; lastRender = now();
 }
 
 function damageMonster(dmg, tag){
   R.monHp -= dmg;
   floatDmg((tag ? tag + ' ' : '') + '-' + dmg, tag ? 'skill' : 'normal');
   if(R.monHp <= 0){ R.monHp = 0; killMonster(); return true; }
+  markDirty();
   return false;
 }
 
@@ -412,10 +419,10 @@ function monsterAttack(){
       R.monHp = R.monHpMax; R.fightStart = now(); R.fightSkillUses = 0;
       render(); save();
     }, 1500);
-    render();
+    render(); dirty = false; lastRender = now();
     return;
   }
-  render();
+  markDirty();
 }
 
 function castSkill(id){
@@ -440,11 +447,14 @@ function castSkill(id){
   } else if(id === 'ironwall'){
     R.armorUntil = now() + 5000;
   } else if(id === 'triple'){
-    for(let i=0;i<3;i++){
-      (function(n){
-        setTimeout(function(){ if(R.monHp > 0){ damageMonster(Math.round(D.atk*0.6), '连斩'); render(); } }, n*130);
-      })(i);
-    }
+    (function(fid){
+      for(let i=0;i<3;i++){
+        setTimeout(function(){
+          if(fid !== R.fightId) return;
+          if(R.monHp > 0) damageMonster(Math.round(D.atk*0.6), '连斩');
+        }, i*130);
+      }
+    })(R.fightId);
   } else if(id === 'crush'){
     damageMonster(Math.round(D.atk*3.0), '碎骨');
     if(S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
@@ -458,7 +468,7 @@ function castSkill(id){
     if(S.slots[i].skill === id) condLabel = CONDS[S.slots[i].cond].label;
   }
   log('【' + sk.name + '】' + condLabel, 'c-skill');
-  render();
+  markDirty();
 }
 
 function checkSkills(){
@@ -503,6 +513,9 @@ function loop(t){
   if(!R.dead && R.monHp > 0){
     R.monTimer += dt;
     if(R.monTimer >= 1700){ R.monTimer = 0; monsterAttack(); }
+  }
+  if(dirty && t - lastRender >= 80){
+    render(); dirty = false; lastRender = t;
   }
   requestAnimationFrame(loop);
 }
@@ -550,7 +563,10 @@ function render(){
   const cnt = slotCount();
   document.getElementById('slotHint').textContent = cnt + ' / 3 槽位';
   const sl = document.getElementById('slotList');
-  sl.innerHTML = S.slots.map(function(s, i){
+  const slKey = cnt + '|' + S.slots.map(function(s){ return (s.skill||'-') + ':' + s.cond; }).join(',');
+  if(slKey !== R.slKey){
+    R.slKey = slKey;
+    sl.innerHTML = S.slots.map(function(s, i){
     if(i >= cnt){
       return '<div class="slot locked"><div class="sicon">🔒</div>' +
         '<div class="sinfo"><div class="sname none">未解锁</div>' +
@@ -564,8 +580,9 @@ function render(){
     const sk = SKILLS[s.skill];
     return '<div class="slot" onclick="openPicker(' + i + ')"><div class="sicon">' + sk.icon + '</div>' +
       '<div class="sinfo"><div class="sname">' + sk.name + '</div>' +
-      '<div class="scond">' + CONDS[s.cond].label + '</div></div><div class="sarrow">›</div></div>';
-  }).join('');
+        '<div class="scond">' + CONDS[s.cond].label + '</div></div><div class="sarrow">›</div></div>';
+    }).join('');
+  }
 
   const costs = {
     atk: Math.round(12*Math.pow(1.24, S.upAtkLv)),
