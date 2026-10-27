@@ -167,6 +167,7 @@ body{
     <div class="mon-emoji" id="monEmoji">🐀</div>
     <div class="mon-name" id="monName">铁皮鼠</div>
     <div class="mon-stage" id="monStage">已吞噬 0 / 10</div>
+    <div id="affixRow" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:8px"></div>
     <div class="bar"><div class="bar-fill hp-mon" id="monHpBar" style="width:100%"></div>
       <div class="bar-txt" id="monHpTxt">20 / 20</div></div>
     <div class="bar" style="height:12px;margin-top:3px"><div class="bar-fill hp-me" id="meHpBar" style="width:100%"></div>
@@ -262,20 +263,29 @@ const FLOOR_NAMES = ['微光裂隙','锈蚀裂隙','深核裂隙'];
 function floorDef(f){            // f 从 0 开始
   const lvl = f + 1;
   if(f < 3){
-    return {tier:['F','E','D'][f], name:FLOOR_NAMES[f],
-      monsters: TEMPLATES.slice(f*3, f*3+3).map(function(t){ return {tpl:t, mult:1}; })};
+    return {tier:['F','E','D'][f], name:FLOOR_NAMES[f], affixes:[],
+      monsters: TEMPLATES.slice(f*3, f*3+3).map(function(t){ return {tpl:t, mult:1, affixes:[]}; })};
   }
   const depth = f - 2;                       // 第 4 层 = 1
   const hpMul  = Math.pow(CFG.hpGrow, depth);
   const atkMul = Math.pow(CFG.monAtkGrow, depth);
   const essMul = Math.pow(CFG.essGrow, depth);
   const grade = ['F','E','D','C','B','A','S','SS','SSS'][Math.min(8, Math.floor(depth/8))];
+  // 词缀：第 4 层起每层 1 个，第 10 层起 2 个（轮换，保证每层有辨识度）
+  const aff = [];
+  const N = AFFIX_ORDER.length;
+  if(f >= 3) aff.push(AFFIX_ORDER[f % N]);
+  if(f >= 9){
+    let second = AFFIX_ORDER[(f*5 + 3) % N];
+    if(second === aff[0]) second = AFFIX_ORDER[(f*5 + 4) % N];
+    aff.push(second);
+  }
   const mons = [];
   for(let i=0;i<3;i++){
     const tpl = TEMPLATES[(f*3 + i) % 9];
-    mons.push({tpl:tpl, mult:hpMul, atkMult:atkMul, essMult:essMul});
+    mons.push({tpl:tpl, mult:hpMul, atkMult:atkMul, essMult:essMul, affixes:aff});
   }
-  return {tier:grade, name:'裂隙 · 第'+lvl+'层', monsters:mons};
+  return {tier:grade, name:'裂隙 · 第'+lvl+'层', monsters:mons, affixes:aff};
 }
 
 // ============================================================
@@ -342,6 +352,19 @@ const CFG = {
   floorCap:   999,
 };
 
+// ============================================================
+// 敌人词缀：只改行为，不改数值
+// ============================================================
+const AFFIXES = {
+  thorns:  {name:'反伤', icon:'🛡', desc:'被打中时反弹伤害（上限为你最大生命的 8%）'},
+  regen:   {name:'再生', icon:'♻️', desc:'每 4 秒回复自身 6% 生命'},
+  enrage:  {name:'狂暴', icon:'⚡', desc:'自身生命低于 35% 时攻击力 ×2'},
+  immune:  {name:'免疫', icon:'🧊', desc:'开战后 3 秒内免疫伤害'},
+  leech:   {name:'吸血', icon:'🩸', desc:'每次攻击回复自身 4% 生命'},
+  burn:    {name:'灼烧', icon:'🔥', desc:'攻击附加 3 秒灼烧'},
+};
+const AFFIX_ORDER = ['thorns','regen','enrage','immune','leech','burn'];
+
 const KILLS_PER_TRAIT = 10;
 const SLOT_UNLOCK = [4, 7];
 const SAVE_KEY = 'devour_idle_v3';
@@ -379,6 +402,7 @@ const R = {
   cds:{},
   fightStart:0, fightSkillUses:0,
   fightId:0, slKey:'', reviveAt:0,
+  regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0,
   killGate:0,               // 自动推进：本层已杀多少只
   dead:false,
 };
@@ -397,6 +421,7 @@ function curMon(){
   const essMult = e.essMult || mult;
   // 同层怪不再随击杀变强：难度只由层数决定
   return {name:t.name, emoji:t.emoji, skill:t.skill,
+    affixes: R.forceAffixes || e.affixes || [],
     hpMax: Math.round(t.hp * mult),
     atk: Math.round(t.atk * atkMult),
     ess: Math.round(t.ess * essMult)};
@@ -496,13 +521,36 @@ function startFight(){
   R.monHpMax = m.hpMax; R.monHp = m.hpMax;
   R.monTimer = 0; R.atkTimer = 0; R.atkCount = 0;
   R.shield = 0;
+  R.regenTimer = 0; R.meBurnUntil = 0; R.meBurnAcc = 0;
   R.fightStart = now(); R.fightSkillUses = 0;
   R.fightId++;
   render();
   dirty = false; lastRender = now();
 }
 
+function hasAffix(k){
+  const m = curMon();
+  return (m.affixes || []).indexOf(k) >= 0;
+}
+
 function damageMonster(dmg, tag){
+  const m = curMon();
+  // 免疫：开战 3 秒内打不动
+  if((m.affixes||[]).indexOf('immune') >= 0 && now() - R.fightStart < 3000){
+    floatDmg('免疫', 'skill');
+    markDirty();
+    return false;
+  }
+  // 反伤：按伤害比例反弹，但设上限，避免高伤害自杀
+  if((m.affixes||[]).indexOf('thorns') >= 0 && dmg > 0){
+    const D2 = derived();
+    const back = Math.min(Math.round(dmg*0.18), Math.round(D2.hpMax*0.08));
+    if(back > 0 && !R.dead){
+      S.hp -= back;
+      floatDmg('反 ' + fmt(back), 'crit');
+      if(S.hp <= 0){ S.hp = 1; }      // 反伤不直接打死，留 1 血
+    }
+  }
   R.monHp -= dmg;
   floatDmg((tag ? tag + ' ' : '') + '-' + fmt(dmg), tag ? 'skill' : 'normal');
   if(R.monHp <= 0){ R.monHp = 0; killMonster(); return true; }
@@ -598,6 +646,11 @@ function advance(silent){
   } else {
     S.floorIdx = Math.min(CFG.floorCap-1, S.floorIdx+1); S.monIdx = 0;
     if(S.floorIdx > S.bestFloor){ S.bestFloor = S.floorIdx; R.slowNoticed = false; }
+    const nf = curFloor();
+    if(nf.affixes && nf.affixes.length){
+      log('【词缀】' + nf.affixes.map(function(k){ return AFFIXES[k].icon + AFFIXES[k].name; }).join(' + ') +
+          ' —— ' + AFFIXES[nf.affixes[0]].desc, 'c-skill');
+    }
     if(!silent) log('【进入】' + curFloor().name, 'c-epic');
     else log('【深入】进入 ' + curFloor().name + '（' + curFloor().tier + '）', 'c-epic');
   }
@@ -608,8 +661,21 @@ function advance(silent){
 function monsterAttack(){
   const D = derived();
   const m = curMon();
-  let dmg = m.atk * (now() < R.armorUntil ? 0.5 : 1);
+  const aff = m.affixes || [];
+  let raw = m.atk;
+  // 狂暴：自身残血时攻击翻倍
+  if(aff.indexOf('enrage') >= 0 && R.monHp / Math.max(1,R.monHpMax) < 0.35) raw *= 2;
+  let dmg = raw * (now() < R.armorUntil ? 0.5 : 1);
   dmg = Math.max(1, Math.round(dmg));
+  // 吸血：攻击后回复自身生命
+  if(aff.indexOf('leech') >= 0 && R.monHp > 0){
+    R.monHp = Math.min(R.monHpMax, R.monHp + Math.round(R.monHpMax*0.04));
+  }
+  // 灼烧：给对方挂持续伤害
+  if(aff.indexOf('burn') >= 0){
+    R.meBurnUntil = now() + 3000;
+    R.meBurnDps = Math.max(1, Math.round(m.atk*0.25));
+  }
 
   if(R.shield > 0){
     const ab = Math.min(R.shield, dmg);
@@ -711,6 +777,28 @@ function tick(dt){
     }
     return;
   }
+  // 再生
+  const affNow = (curMon().affixes || []);
+  if(R.monHp > 0 && R.monHp < R.monHpMax && affNow.indexOf('regen') >= 0){
+    R.regenTimer += dt;
+    if(R.regenTimer >= 4000){
+      R.regenTimer = 0;
+      R.monHp = Math.min(R.monHpMax, R.monHp + Math.round(R.monHpMax*0.06));
+      floatDmg('再生', 'skill');
+      markDirty();
+    }
+  }
+  // 玩家灼烧
+  if(now() < R.meBurnUntil){
+    R.meBurnAcc += dt;
+    if(R.meBurnAcc >= 1000){
+      R.meBurnAcc = 0;
+      S.hp -= R.meBurnDps;
+      floatDmg('灼 -' + fmt(R.meBurnDps), 'normal');
+      if(S.hp <= 0) S.hp = 1;
+      markDirty();
+    }
+  }
   if(R.monHp > 0 && now() < R.poisonUntil){
     R.poisonAcc += dt;
     if(R.poisonAcc >= 1000){
@@ -765,6 +853,21 @@ function render(){
   st.textContent = (hasSkill ? '已吞噬 · 技能已获得 · ' : '') +
     '本层 ' + R.killGate + '/' + KILLS_PER_TRAIT + ' 只后推进';
   st.style.color = hasSkill ? '#a78bfa' : '#5a6b80';
+
+  // 词缀标签
+  const ar = document.getElementById('affixRow');
+  const affs = m.affixes || [];
+  const affKey = affs.join(',');
+  if(ar.dataset.k !== affKey){
+    ar.dataset.k = affKey;
+    ar.innerHTML = affs.map(function(k){
+      const a = AFFIXES[k];
+      return '<span style="font-size:10.5px;padding:3px 8px;border-radius:20px;' +
+        'background:rgba(224,128,128,.12);border:1px solid rgba(224,128,128,.35);color:#e8b0b0">' +
+        a.icon + ' ' + a.name + '</span>';
+    }).join('');
+    ar.title = affs.map(function(k){ return AFFIXES[k].name + '：' + AFFIXES[k].desc; }).join('\n');
+  }
 
   document.getElementById('monHpBar').style.width = (pct*100) + '%';
   document.getElementById('monHpTxt').textContent = fmt(Math.max(0,R.monHp)) + ' / ' + fmt(R.monHpMax);
