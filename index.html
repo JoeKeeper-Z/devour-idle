@@ -14,93 +14,83 @@ body{
   user-select:none;-webkit-user-select:none;
   background-image:radial-gradient(circle at 50% 0%,#141d2b 0%,#0a0e14 60%);
 }
-#app{max-width:480px;margin:0 auto;padding:10px 12px 90px;position:relative}
+#app{max-width:480px;margin:0 auto;padding:10px 12px 112px}
 
-/* ---------- 顶栏 ---------- */
 .topbar{display:flex;justify-content:space-between;align-items:center;
   padding:8px 12px;background:rgba(20,29,43,.7);border:1px solid #1e2b3d;
   border-radius:10px;margin-bottom:10px;font-size:13px}
 .topbar .ess{color:#7dd3a0;font-weight:600}
 .topbar .floor{color:#7aa2f7}
 
-/* ---------- 怪物卡 ---------- */
-.monster{
-  background:linear-gradient(180deg,#141d2b 0%,#0f1620 100%);
+.monster{background:linear-gradient(180deg,#141d2b 0%,#0f1620 100%);
   border:1px solid #1e2b3d;border-radius:14px;padding:14px;margin-bottom:10px;
-  position:relative;overflow:hidden;
-}
+  position:relative;overflow:hidden}
 .monster::before{content:"";position:absolute;inset:0;
   background:radial-gradient(circle at 50% 30%,rgba(122,162,247,.08),transparent 70%);
   pointer-events:none}
 .mon-name{font-size:17px;font-weight:700;color:#e6edf7;margin-bottom:2px;text-align:center}
 .mon-stage{font-size:11px;color:#5a6b80;text-align:center;margin-bottom:10px}
-.mon-emoji{font-size:52px;text-align:center;line-height:1.1;margin-bottom:8px;
+.mon-emoji{font-size:52px;text-align:center;line-height:1.15;margin-bottom:8px;
   filter:drop-shadow(0 0 14px rgba(122,162,247,.35))}
 .bar{background:#0a0e14;border-radius:6px;height:16px;overflow:hidden;
   border:1px solid #1e2b3d;position:relative;margin-bottom:6px}
 .bar-fill{height:100%;transition:width .18s linear;border-radius:5px}
 .bar-fill.hp-mon{background:linear-gradient(90deg,#e05252,#f28b8b)}
 .bar-fill.hp-me{background:linear-gradient(90deg,#3f8f5f,#7dd3a0)}
-.bar-fill.exp{background:linear-gradient(90deg,#6b4fbf,#a78bfa)}
 .bar-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:600;color:#e6edf7;text-shadow:0 1px 2px #000}
+.bar.shield{height:6px;margin-top:-3px;margin-bottom:8px;border-color:#2b3f5c}
+.bar.shield .bar-fill{background:linear-gradient(90deg,#4a7fd4,#8fb8f0)}
 
-/* ---------- 攻击按钮 ---------- */
-.attack{
-  width:100%;padding:18px;border:none;border-radius:14px;cursor:pointer;
-  background:linear-gradient(135deg,#7a5cd6,#3d6fd6);color:#fff;
-  font-size:17px;font-weight:700;letter-spacing:1px;
-  box-shadow:0 4px 18px rgba(93,108,214,.35);
-  transition:transform .06s,box-shadow .06s;margin-bottom:10px;
-}
-.attack:active{transform:scale(.97);box-shadow:0 2px 8px rgba(93,108,214,.3)}
-.attack[disabled]{opacity:.45}
+.auto-tag{display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:12px;color:#7dd3a0;padding:8px;margin-bottom:10px;
+  background:rgba(63,143,95,.1);border:1px solid rgba(63,143,95,.3);border-radius:9px}
+.dot{width:6px;height:6px;border-radius:50%;background:#7dd3a0;
+  animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
 
-/* ---------- 面板区 ---------- */
 .panel{background:rgba(20,29,43,.55);border:1px solid #1e2b3d;border-radius:12px;
   padding:12px;margin-bottom:10px}
-.panel h3{font-size:12px;color:#5a6b80;font-weight:600;letter-spacing:1px;margin-bottom:10px}
+.panel h3{font-size:12px;color:#5a6b80;font-weight:600;letter-spacing:1px;margin-bottom:10px;
+  display:flex;justify-content:space-between}
+.panel h3 .hint{color:#3d4d61;font-weight:500;letter-spacing:0}
 .row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;
   font-size:13px;border-bottom:1px solid rgba(30,43,61,.6)}
 .row:last-child{border-bottom:none}
 .row .k{color:#8a9bb0}
 .row .v{color:#e6edf7;font-weight:600;font-variant-numeric:tabular-nums}
 
-/* ---------- 升级按钮 ---------- */
 .upg{display:flex;flex-wrap:wrap;gap:8px}
-.upg button{
-  flex:1 1 calc(50% - 4px);padding:12px 8px;border-radius:10px;cursor:pointer;
+.upg button{flex:1 1 calc(50% - 4px);padding:12px 8px;border-radius:10px;cursor:pointer;
   background:#16202e;border:1px solid #22303f;color:#c8d3e0;
-  font-size:13px;font-weight:600;transition:.12s;font-family:inherit;
-}
+  font-size:13px;font-weight:600;transition:.12s;font-family:inherit}
 .upg button:active{transform:scale(.96)}
 .upg button.can{border-color:#3f8f5f;background:rgba(63,143,95,.15);color:#a7e3bd}
 .upg button:disabled{opacity:.4}
 .upg .cost{display:block;font-size:11px;color:#7dd3a0;margin-top:3px;font-weight:500}
 
-/* ---------- 吞噬/进化 ---------- */
-.trait{display:flex;gap:8px;align-items:flex-start;padding:8px 0;
-  border-bottom:1px solid rgba(30,43,61,.6);font-size:12px}
-.trait:last-child{border-bottom:none}
-.trait .icon{font-size:16px;flex-shrink:0}
-.trait .body{flex:1}
-.trait .tname{color:#a78bfa;font-weight:700;margin-bottom:2px}
-.trait .tdesc{color:#8a9bb0;font-size:11px;line-height:1.4}
-.trait .prog{font-size:10px;color:#5a6b80;margin-top:2px}
-.trait.locked .tname{color:#44566b}
-.trait.locked .icon{filter:grayscale(1);opacity:.4}
+.slot{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;
+  background:#101a26;border:1px solid #1e2b3d;margin-bottom:8px;cursor:pointer}
+.slot:active{background:#16222f}
+.slot.empty{border-style:dashed;opacity:.8}
+.slot .sicon{font-size:20px;width:26px;text-align:center}
+.slot .sinfo{flex:1;min-width:0}
+.slot .sname{font-size:13px;font-weight:700;color:#c4a5ff;margin-bottom:2px}
+.slot .scond{font-size:11px;color:#8a9bb0}
+.slot .sarrow{color:#3d4d61;font-size:14px}
+.slot.locked{opacity:.4;cursor:default}
+.slot .sname.none{color:#5a6b80}
 
-/* ---------- 日志 ---------- */
-.log{max-height:110px;overflow-y:auto;font-size:11.5px;line-height:1.7;color:#8a9bb0;
+.log{max-height:132px;overflow-y:auto;font-size:11.5px;line-height:1.75;color:#8a9bb0;
   font-family:ui-monospace,Consolas,monospace}
 .log div{padding:1px 0}
 .log .c-good{color:#7dd3a0}
 .log .c-bad{color:#e08080}
 .log .c-epic{color:#c4a5ff;font-weight:600}
+.log .c-skill{color:#8fb8f0}
 .log::-webkit-scrollbar{width:3px}
 .log::-webkit-scrollbar-thumb{background:#22303f;border-radius:2px}
 
-/* ---------- 底栏 ---------- */
 .bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(10,14,20,.96);
   border-top:1px solid #1e2b3d;padding:8px 12px;display:flex;gap:8px;
   backdrop-filter:blur(12px);z-index:10}
@@ -108,24 +98,42 @@ body{
   background:#16202e;color:#8a9bb0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .bottom button:active{transform:scale(.96)}
 
-/* ---------- 浮动伤害 ---------- */
 @keyframes floatUp{0%{opacity:1;transform:translate(-50%,0) scale(1)}
   100%{opacity:0;transform:translate(-50%,-46px) scale(1.15)}}
-.dmg{position:absolute;left:50%;top:40%;font-size:20px;font-weight:800;
+.dmg{position:absolute;left:50%;top:40%;font-size:19px;font-weight:800;
   pointer-events:none;animation:floatUp .75s ease-out forwards;z-index:5;
   text-shadow:0 2px 6px #000}
-.dmg.crit{font-size:27px;color:#ffd166}
+.dmg.crit{font-size:26px;color:#ffd166}
 .dmg.normal{color:#ff9d9d}
+.dmg.skill{color:#9de3ff;font-size:22px}
 
-/* ---------- 吞噬闪光 ---------- */
 @keyframes devourFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
 .flash{position:fixed;inset:0;background:radial-gradient(circle,rgba(167,139,250,.35),transparent 65%);
   pointer-events:none;animation:devourFlash .9s ease-out;z-index:20}
-
-.toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);
+.toast{position:fixed;left:50%;top:16%;transform:translateX(-50%);
   background:rgba(167,139,250,.95);color:#0a0e14;padding:10px 18px;border-radius:9px;
   font-size:13px;font-weight:700;z-index:30;pointer-events:none;
   box-shadow:0 6px 24px rgba(167,139,250,.4);animation:devourFlash 1.8s ease-out forwards}
+
+.overlay{position:fixed;inset:0;background:rgba(4,7,11,.82);z-index:50;
+  display:none;align-items:flex-end;backdrop-filter:blur(3px)}
+.overlay.on{display:flex}
+.sheet{width:100%;max-height:82vh;overflow-y:auto;background:#0f1620;
+  border-top:1px solid #22303f;border-radius:16px 16px 0 0;padding:16px 14px 24px;
+  animation:slideUp .18s ease-out}
+@keyframes slideUp{from{transform:translateY(30px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.sheet h4{font-size:13px;color:#7aa2f7;margin-bottom:10px;font-weight:700}
+.opt{display:flex;align-items:center;gap:10px;padding:11px;border-radius:9px;
+  background:#131d29;border:1px solid #1e2b3d;margin-bottom:7px;cursor:pointer;font-size:12.5px}
+.opt:active{background:#1a2836}
+.opt.sel{border-color:#7a5cd6;background:rgba(122,92,214,.16)}
+.opt.lock{opacity:.35;cursor:default}
+.opt .oi{font-size:17px;width:22px;text-align:center}
+.opt .ot{flex:1}
+.opt .od{font-size:10.5px;color:#7e8fa3;margin-top:2px}
+.sheet .close{width:100%;padding:12px;border-radius:9px;border:1px solid #22303f;
+  background:#16202e;color:#8a9bb0;font-size:13px;font-weight:600;margin-top:12px;
+  cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
@@ -143,17 +151,24 @@ body{
     <div class="bar"><div class="bar-fill hp-mon" id="monHpBar" style="width:100%"></div>
       <div class="bar-txt" id="monHpTxt">20 / 20</div></div>
     <div class="bar" style="height:10px"><div class="bar-fill hp-me" id="meHpBar" style="width:100%"></div>
-      <div class="bar-txt" style="font-size:9px;opacity:.75" id="meHpTxt">你 50 / 50</div></div>
+      <div class="bar-txt" style="font-size:9px;opacity:.8" id="meHpTxt">你 50 / 50</div></div>
+    <div class="bar shield" id="shieldBar" style="display:none">
+      <div class="bar-fill" id="shieldFill" style="width:0%"></div></div>
   </div>
 
-  <button class="attack" id="btnAttack">攻 击</button>
+  <div class="auto-tag"><span class="dot"></span><span id="autoTxt">自动战斗中</span></div>
+
+  <div class="panel">
+    <h3>战术 <span class="hint" id="slotHint">1 / 3 槽位</span></h3>
+    <div id="slotList"></div>
+  </div>
 
   <div class="panel">
     <h3>属性</h3>
     <div class="row"><span class="k">攻击力</span><span class="v" id="sAtk">5</span></div>
     <div class="row"><span class="k">生命</span><span class="v" id="sHp">50 / 50</span></div>
     <div class="row"><span class="k">暴击率</span><span class="v" id="sCrit">5%</span></div>
-    <div class="row"><span class="k">每秒精华</span><span class="v" id="sEss">0</span></div>
+    <div class="row"><span class="k">上一战</span><span class="v" id="sLast">—</span></div>
   </div>
 
   <div class="panel">
@@ -162,17 +177,12 @@ body{
       <button id="uAtk">攻击 +2<span class="cost" id="cAtk">10 精华</span></button>
       <button id="uHp">生命 +10<span class="cost" id="cHp">10 精华</span></button>
       <button id="uCrit">暴击 +1%<span class="cost" id="cCrit">25 精华</span></button>
-      <button id="uAuto">自动攻击<span class="cost" id="cAuto">60 精华</span></button>
+      <button id="uSpeed">攻速 +8%<span class="cost" id="cSpeed">40 精华</span></button>
     </div>
   </div>
 
   <div class="panel">
-    <h3>吞噬图鉴</h3>
-    <div id="traitList"></div>
-  </div>
-
-  <div class="panel">
-    <h3>记录</h3>
+    <h3>战斗记录</h3>
     <div class="log" id="log"></div>
   </div>
 
@@ -183,245 +193,316 @@ body{
   <button id="btnReset">重置</button>
 </div>
 
+<div class="overlay" id="overlay">
+  <div class="sheet" id="sheet"></div>
+</div>
+
 <script>
 // ============================================================
-// 配置：顶层数值表（改这里就能调平衡）
+// 怪物表
 // ============================================================
 const FLOORS = [
   { tier:'F', name:'微光裂隙', monsters:[
-    {name:'铁皮鼠', emoji:'🐀', hp:20,  atk:2, ess:3,
-     trait:{icon:'🛡', name:'皮糙', desc:'最大生命 +20%'}},
-    {name:'腐骨犬', emoji:'🐕', hp:34,  atk:3, ess:4,
-     trait:{icon:'🩸', name:'嗜血', desc:'击杀回复 6% 生命'}},
-    {name:'灰翼蝠', emoji:'🦇', hp:44,  atk:4, ess:5,
-     trait:{icon:'⚡', name:'迅捷', desc:'攻击间隔 -12%'}},
+    {name:'铁皮鼠', emoji:'🐀', hp:20,  atk:2, ess:3,  skill:'harden'},
+    {name:'腐骨犬', emoji:'🐕', hp:34,  atk:3, ess:4,  skill:'bloodthirst'},
+    {name:'灰翼蝠', emoji:'🦇', hp:44,  atk:4, ess:5,  skill:'haste'},
   ]},
   { tier:'E', name:'锈蚀裂隙', monsters:[
-    {name:'幽影狼', emoji:'🐺', hp:78,  atk:7, ess:8,
-     trait:{icon:'🗡', name:'撕裂', desc:'暴击伤害 +40%'}},
-    {name:'熔岩蛛', emoji:'🕷', hp:110, atk:9, ess:10,
-     trait:{icon:'☠', name:'淬毒', desc:'每次攻击附加 3 点真实伤害'}},
-    {name:'石甲蜥', emoji:'🦎', hp:165, atk:11, ess:13,
-     trait:{icon:'🪨', name:'甲壳', desc:'受到伤害 -18%'}},
+    {name:'幽影狼', emoji:'🐺', hp:78,  atk:7, ess:8,  skill:'rend'},
+    {name:'熔岩蛛', emoji:'🕷', hp:110, atk:9, ess:10, skill:'venom'},
+    {name:'石甲蜥', emoji:'🦎', hp:165, atk:11,ess:13, skill:'ironwall'},
   ]},
   { tier:'D', name:'深核裂隙', monsters:[
-    {name:'电光隼', emoji:'🦅', hp:240, atk:16, ess:18,
-     trait:{icon:'✨', name:'连击', desc:'22% 概率追加一次攻击'}},
-    {name:'骨刺巨像', emoji:'💀', hp:340, atk:21, ess:22,
-     trait:{icon:'💥', name:'重压', desc:'攻击力 +15%'}},
-    {name:'虚空之眼', emoji:'👁', hp:470, atk:26, ess:28,
-     trait:{icon:'🌀', name:'噬魂', desc:'击杀获得精华 +25%'}},
+    {name:'电光隼', emoji:'🦅', hp:240, atk:16,ess:18, skill:'triple'},
+    {name:'骨刺巨像', emoji:'💀', hp:340, atk:21,ess:22, skill:'crush'},
+    {name:'虚空之眼', emoji:'👁', hp:470, atk:26,ess:28, skill:'soul'},
   ]},
 ];
 
-const KILLS_PER_TRAIT = 10;   // 同类击杀多少只解锁吞噬
-const MAX_TRAITS = FLOORS.reduce((a,f)=>a+f.monsters.length,0);
+// ============================================================
+// 技能表（吞噬获得）
+// ============================================================
+const SKILLS = {
+  harden:      {name:'硬化', icon:'🛡', cd:7000,  desc:'获得最大生命 20% 的护盾'},
+  bloodthirst: {name:'嗜血', icon:'🩸', cd:6000,  desc:'立即回复 10% 生命'},
+  haste:       {name:'疾风', icon:'⚡', cd:13000, desc:'5 秒内攻速 ×2'},
+  rend:        {name:'裂爪', icon:'🗡', cd:6000,  desc:'一次 220% 攻击力的重击'},
+  venom:       {name:'淬毒', icon:'☠', cd:8000,  desc:'中毒 6 秒，每秒 30% 攻击力'},
+  ironwall:    {name:'铁壁', icon:'🪨', cd:14000, desc:'5 秒内受到伤害 -50%'},
+  triple:      {name:'连斩', icon:'✨', cd:7000,  desc:'连续 3 次 60% 攻击力攻击'},
+  crush:       {name:'碎骨', icon:'💥', cd:10000, desc:'300% 攻击力，自损 5% 生命'},
+  soul:        {name:'噬魂', icon:'🌀', cd:16000, desc:'立即获得 3 倍怪物精华'},
+};
+
+const CONDS = {
+  always:   {label:'无条件（冷却好就放）', test:function(c){ return true; }},
+  enemyLow: {label:'敌人生命 < 35%',       test:function(c){ return c.monPct < 0.35; }},
+  selfLow:  {label:'自身生命 < 55%',       test:function(c){ return c.mePct < 0.55; }},
+  opening:  {label:'敌人生命 > 70%（开局）', test:function(c){ return c.monPct > 0.70; }},
+  every3:   {label:'每 3 次普攻后',        test:function(c){ return c.atkCount > 0 && c.atkCount % 3 === 0; }},
+};
+
+const KILLS_PER_TRAIT = 10;
+const SLOT_UNLOCK = [4, 7];
+const SAVE_KEY = 'devour_idle_v2';
 
 // ============================================================
 // 状态
 // ============================================================
-const SAVE_KEY = 'devour_idle_v1';
-let S = null;
-
 function freshState(){
   return {
-    ess:0,
-    floorIdx:0,          // 楼层
-    monIdx:0,            // 本层怪物序号
-    kills:{},            // 各怪击杀数
-    traits:[],           // 已解锁特性 key
-    atk:5, hpMax:50, hp:50, crit:5,
+    ess:0, totalEss:0,
+    floorIdx:0, monIdx:0,
+    kills:{}, skills:[],
+    slots:[{skill:null,cond:'always'},{skill:null,cond:'always'},{skill:null,cond:'always'}],
+    atk:5, hpMax:50, hp:50, crit:5, spdLv:0,
     upAtkLv:0, upHpLv:0, upCritLv:0,
-    autoUnlocked:false, autoOn:true,
-    monHp:null,
-    totalEss:0,
+    lastFight:null,
   };
 }
+let S = null;
 
-// ---------- 派生属性（含吞噬特性加成） ----------
-function derived(){
-  const has = k => S.traits.includes(k);
-  let atk = S.atk, hpMax = S.hpMax, crit = S.crit;
-  if(has('重压')) atk = Math.round(atk * 1.15);
-  if(has('皮糙')) hpMax = Math.round(hpMax * 1.20);
-  return {
-    atk, hpMax, crit,
-    critDmg: has('撕裂') ? 1.9 : 1.5,
-    atkInterval: has('迅捷') ? 850 : 1000,
-    dmgReduce: has('甲壳') ? 0.82 : 1.0,
-    lifesteal: has('嗜血') ? 0.06 : 0,
-    poison: has('淬毒') ? 3 : 0,
-    doubleChance: has('连击') ? 0.22 : 0,
-    essBonus: has('噬魂') ? 1.25 : 1.0,
-  };
+function slotCount(){
+  return 1 + SLOT_UNLOCK.filter(function(n){ return S.skills.length >= n; }).length;
 }
 
-// ---------- 当前怪物 ----------
+// ---------- 运行时（不入档） ----------
+const R = {
+  monHp:0, monHpMax:1,
+  monTimer:0, atkTimer:0, atkCount:0,
+  shield:0,
+  hasteUntil:0, armorUntil:0, poisonUntil:0, poisonDps:0, poisonAcc:0,
+  cds:{},
+  fightStart:0, fightSkillUses:0,
+  dead:false,
+};
+
 function curMon(){
-  const f = FLOORS[S.floorIdx];
-  const m = f.monsters[S.monIdx];
-  const killed = S.kills[m.name] || 0;
-  // 每次重生略微变强（+8%），避免无限刷同一只过于划算
-  const scale = 1 + Math.max(0, Math.floor(killed / KILLS_PER_TRAIT) - 1) * 0.08;
+  const f = FLOORS[S.floorIdx], m = f.monsters[S.monIdx];
+  const k = S.kills[m.name] || 0;
+  const scale = 1 + Math.max(0, Math.floor(k / KILLS_PER_TRAIT) - 1) * 0.10;
+  return {name:m.name, emoji:m.emoji, skill:m.skill,
+    hpMax:Math.round(m.hp*scale), atk:Math.round(m.atk*scale), ess:Math.round(m.ess*scale)};
+}
+
+function derived(){
+  const has = function(id){ return S.skills.indexOf(id) >= 0; };
   return {
-    ...m,
-    hpMax: Math.round(m.hp * scale),
-    atk: Math.round(m.atk * scale),
-    ess: Math.round(m.ess * scale),
+    atk:S.atk,
+    hpMax:S.hpMax,
+    crit:S.crit,
+    critDmg: has('rend') ? 1.8 : 1.5,
+    atkInterval: 900 * Math.pow(0.92, S.spdLv),
   };
 }
 
 // ============================================================
-// 存档
+// 工具
 // ============================================================
-function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
-function load(){
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(raw){ S = Object.assign(freshState(), JSON.parse(raw)); return true; }
-  }catch(e){}
-  S = freshState(); return false;
-}
+function now(){ return performance.now(); }
 
-// ============================================================
-// 主逻辑
-// ============================================================
-let monHp = 0, monTimer = 0, autoTimer = 0, dead = false;
-
-function initMonster(){
-  const m = curMon();
-  monHp = m.hpMax;
-  monTimer = 0;
-  S.monHp = monHp;
-  dead = false;
-  render();
-}
-
-function log(msg, cls=''){
+function log(msg, cls){
   const el = document.getElementById('log');
   const d = document.createElement('div');
   if(cls) d.className = cls;
   d.textContent = msg;
   el.insertBefore(d, el.firstChild);
-  while(el.children.length > 60) el.removeChild(el.lastChild);
+  while(el.children.length > 50) el.removeChild(el.lastChild);
 }
-
-function floatDmg(text, crit){
+function floatDmg(text, kind){
   const d = document.createElement('div');
-  d.className = 'dmg ' + (crit ? 'crit' : 'normal');
+  d.className = 'dmg ' + (kind || 'normal');
   d.textContent = text;
   d.style.left = (45 + Math.random()*10) + '%';
   document.getElementById('monsterCard').appendChild(d);
-  setTimeout(()=>d.remove(), 800);
+  setTimeout(function(){ d.remove(); }, 800);
+}
+function flash(){ const f=document.createElement('div'); f.className='flash';
+  document.body.appendChild(f); setTimeout(function(){f.remove();},950); }
+function toast(msg){ const t=document.createElement('div'); t.className='toast';
+  t.textContent=msg; document.body.appendChild(t); setTimeout(function(){t.remove();},1850); }
+
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw){
+      const p = JSON.parse(raw);
+      S = Object.assign(freshState(), p);
+      if(!Array.isArray(S.slots) || S.slots.length !== 3) S.slots = freshState().slots;
+      if(!Array.isArray(S.skills)) S.skills = [];
+      return true;
+    }
+  }catch(e){}
+  S = freshState();
+  return false;
 }
 
-function screenFlash(){
-  const f = document.createElement('div');
-  f.className = 'flash';
-  document.body.appendChild(f);
-  setTimeout(()=>f.remove(), 950);
-}
-
-function toast(msg){
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 1850);
-}
-
-// ---------- 玩家攻击 ----------
-function playerHit(){
-  if(dead) return;
-  const D = derived();
-  let dmg = D.atk + D.poison;
-  const isCrit = Math.random()*100 < D.crit;
-  if(isCrit) dmg = Math.round(dmg * D.critDmg);
-  applyDamage(dmg, isCrit);
-  // 连击
-  if(Math.random() < D.doubleChance){
-    setTimeout(()=>{ if(!dead && monHp > 0) {
-      const d2 = Math.round(S.atk * 0.7);
-      floatDmg(d2, false);
-      applyDamage(d2, false);
-    }}, 110);
-  }
-}
-
-function applyDamage(dmg, isCrit){
-  monHp -= dmg;
-  floatDmg('-' + dmg, isCrit);
-  if(monHp <= 0){ monHp = 0; killMonster(); }
+// ============================================================
+// 战斗核心
+// ============================================================
+function startFight(){
+  const m = curMon();
+  R.monHpMax = m.hpMax; R.monHp = m.hpMax;
+  R.monTimer = 0; R.atkTimer = 0; R.atkCount = 0;
+  R.shield = 0;
+  R.fightStart = now(); R.fightSkillUses = 0;
   render();
+}
+
+function damageMonster(dmg, tag){
+  R.monHp -= dmg;
+  floatDmg((tag ? tag + ' ' : '') + '-' + dmg, tag ? 'skill' : 'normal');
+  if(R.monHp <= 0){ R.monHp = 0; killMonster(); return true; }
+  return false;
+}
+
+function playerAttack(){
+  const D = derived();
+  const isCrit = Math.random()*100 < D.crit;
+  const dmg = isCrit ? Math.round(D.atk*D.critDmg) : D.atk;
+  R.atkCount++;
+  damageMonster(dmg, isCrit ? '暴击' : '');
 }
 
 function killMonster(){
   const m = curMon();
-  const D = derived();
-  const gain = Math.round(m.ess * D.essBonus);
-  S.ess += gain; S.totalEss += gain;
-
+  const dur = ((now() - R.fightStart)/1000).toFixed(1);
+  S.ess += m.ess; S.totalEss += m.ess;
   S.kills[m.name] = (S.kills[m.name] || 0) + 1;
   const k = S.kills[m.name];
-  log(`击杀 ${m.name}，+${gain} 精华（累计 ${k}/${KILLS_PER_TRAIT}）`, 'c-good');
 
-  // 吸血
-  if(D.lifesteal > 0){
-    const heal = Math.round(D.hpMax * D.lifesteal);
-    S.hp = Math.min(D.hpMax, S.hp + heal);
+  S.lastFight = {t:parseFloat(dur), name:m.name, uses:R.fightSkillUses};
+  const lf = document.getElementById('sLast');
+  if(lf) lf.textContent = dur + 's · ' + R.fightSkillUses + ' 技能';
+
+  log('击杀 ' + m.name + '｜' + dur + 's｜+' + m.ess + ' 精华｜技能 ' + R.fightSkillUses + ' 次', 'c-good');
+
+  if(k === KILLS_PER_TRAIT && S.skills.indexOf(m.skill) < 0){
+    S.skills.push(m.skill);
+    const sk = SKILLS[m.skill];
+    flash(); toast('吞噬完成 · ' + sk.icon + ' ' + sk.name);
+    log('【吞噬进化】习得技能：' + sk.name + ' —— ' + sk.desc, 'c-epic');
+    if(S.skills.length === SLOT_UNLOCK[0] || S.skills.length === SLOT_UNLOCK[1]){
+      log('【系统】战术槽位 +1（当前 ' + slotCount() + ' 槽）', 'c-epic');
+      toast('战术槽位 +1');
+    }
   }
+  startFight(); save();
+}
 
-  // 吞噬解锁
-  if(k === KILLS_PER_TRAIT && !S.traits.includes(m.trait.name)){
-    S.traits.push(m.trait.name);
-    screenFlash();
-    toast(`吞噬完成 · ${m.trait.icon} ${m.trait.name}`);
-    log(`【吞噬进化】获得特性：${m.trait.name} —— ${m.trait.desc}`, 'c-epic');
+function monsterAttack(){
+  const D = derived();
+  const m = curMon();
+  let dmg = m.atk * (now() < R.armorUntil ? 0.5 : 1);
+  dmg = Math.max(1, Math.round(dmg));
+
+  if(R.shield > 0){
+    const ab = Math.min(R.shield, dmg);
+    R.shield -= ab; dmg -= ab;
+    if(ab > 0) floatDmg('盾 -' + ab, 'skill');
   }
+  if(dmg > 0) S.hp -= dmg;
 
-  initMonster();
-  save();
+  if(S.hp <= 0){
+    S.hp = 0; R.dead = true;
+    log('【重伤】被 ' + m.name + ' 击退，回营地恢复', 'c-bad');
+    setTimeout(function(){
+      S.hp = derived().hpMax; R.dead = false;
+      R.monHp = R.monHpMax; R.fightStart = now(); R.fightSkillUses = 0;
+      render(); save();
+    }, 1500);
+    render();
+    return;
+  }
   render();
 }
 
-// ---------- 怪物反击 ----------
-function monsterTick(dt){
-  if(dead) return;
+function castSkill(id){
   const D = derived();
+  const sk = SKILLS[id];
   const m = curMon();
-  monTimer += dt;
-  if(monTimer >= 1500){
-    monTimer = 0;
-    const raw = m.atk;
-    const dmg = Math.max(1, Math.round(raw * D.dmgReduce));
-    S.hp -= dmg;
-    log(`${m.name} 反击，受到 ${dmg} 伤害`, 'c-bad');
-    if(S.hp <= 0){
-      S.hp = 0; dead = true;
-      log('【重伤】被击退回营地，生命已恢复', 'c-bad');
-      setTimeout(()=>{
-        S.hp = D.hpMax; dead = false;
-        initMonster();
-        log('已恢复，继续。');
-        render(); save();
-      }, 1400);
+  R.cds[id] = now() + sk.cd;
+  R.fightSkillUses++;
+
+  if(id === 'harden'){
+    R.shield += Math.round(D.hpMax*0.2);
+  } else if(id === 'bloodthirst'){
+    const heal = Math.round(D.hpMax*0.1);
+    S.hp = Math.min(D.hpMax, S.hp + heal);
+    floatDmg('+' + heal, 'skill');
+  } else if(id === 'haste'){
+    R.hasteUntil = now() + 5000;
+  } else if(id === 'rend'){
+    damageMonster(Math.round(D.atk*2.2), '裂爪');
+  } else if(id === 'venom'){
+    R.poisonUntil = now() + 6000; R.poisonDps = Math.max(1, Math.round(D.atk*0.3));
+  } else if(id === 'ironwall'){
+    R.armorUntil = now() + 5000;
+  } else if(id === 'triple'){
+    for(let i=0;i<3;i++){
+      (function(n){
+        setTimeout(function(){ if(R.monHp > 0){ damageMonster(Math.round(D.atk*0.6), '连斩'); render(); } }, n*130);
+      })(i);
     }
-    render();
+  } else if(id === 'crush'){
+    damageMonster(Math.round(D.atk*3.0), '碎骨');
+    if(S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
+  } else if(id === 'soul'){
+    S.ess += m.ess*3;
+    floatDmg('+' + (m.ess*3) + '精华', 'skill');
+  }
+
+  let condLabel = '无条件';
+  for(let i=0;i<3;i++){
+    if(S.slots[i].skill === id) condLabel = CONDS[S.slots[i].cond].label;
+  }
+  log('【' + sk.name + '】' + condLabel, 'c-skill');
+  render();
+}
+
+function checkSkills(){
+  const D = derived();
+  const ctx = {
+    monPct: R.monHp / Math.max(1, R.monHpMax),
+    mePct: S.hp / Math.max(1, D.hpMax),
+    atkCount: R.atkCount,
+  };
+  const cnt = slotCount();
+  for(let i=0;i<cnt;i++){
+    const slot = S.slots[i];
+    if(!slot.skill) continue;
+    if((R.cds[slot.skill] || 0) > now()) continue;
+    if(!CONDS[slot.cond].test(ctx)) continue;
+    castSkill(slot.skill);
+    if(R.monHp <= 0) return;
   }
 }
 
-// ---------- 主循环 ----------
+// ============================================================
+// 主循环
+// ============================================================
 let last = performance.now();
-function loop(now){
-  const dt = Math.min(120, now - last); last = now;
+function loop(t){
+  const dt = Math.min(150, t - last); last = t;
 
-  if(!dead){
-    monsterTick(dt);
-    if(S.autoUnlocked && S.autoOn){
-      autoTimer += dt;
-      const D = derived();
-      if(autoTimer >= D.atkInterval){ autoTimer = 0; playerHit(); }
+  if(!R.dead && R.monHp > 0 && now() < R.poisonUntil){
+    R.poisonAcc += dt;
+    if(R.poisonAcc >= 1000){
+      R.poisonAcc = 0;
+      damageMonster(R.poisonDps, '毒');
     }
+  }
+  if(!R.dead && R.monHp > 0){
+    const D = derived();
+    const interval = now() < R.hasteUntil ? D.atkInterval*0.5 : D.atkInterval;
+    R.atkTimer += dt;
+    if(R.atkTimer >= interval){ R.atkTimer = 0; playerAttack(); }
+  }
+  if(!R.dead && R.monHp > 0) checkSkills();
+  if(!R.dead && R.monHp > 0){
+    R.monTimer += dt;
+    if(R.monTimer >= 1700){ R.monTimer = 0; monsterAttack(); }
   }
   requestAnimationFrame(loop);
 }
@@ -434,8 +515,8 @@ function render(){
   const m = curMon();
   const f = FLOORS[S.floorIdx];
   const killed = S.kills[m.name] || 0;
-  const pct = Math.max(0, monHp / m.hpMax);
-  const hasTrait = S.traits.includes(m.trait.name);
+  const hasSkill = S.skills.indexOf(m.skill) >= 0;
+  const pct = Math.max(0, R.monHp / Math.max(1, R.monHpMax));
 
   document.getElementById('ess').textContent = S.ess;
   document.getElementById('floorName').textContent = f.tier;
@@ -443,68 +524,61 @@ function render(){
 
   document.getElementById('monEmoji').textContent = m.emoji;
   document.getElementById('monName').textContent = m.name;
-  document.getElementById('monStage').textContent =
-    hasTrait ? '已吞噬 · 特性已获得' : `已吞噬 ${killed} / ${KILLS_PER_TRAIT}`;
-  document.getElementById('monStage').style.color = hasTrait ? '#a78bfa' : '#5a6b80';
+  const st = document.getElementById('monStage');
+  st.textContent = hasSkill ? '已吞噬 · 技能已获得' : '已吞噬 ' + killed + ' / ' + KILLS_PER_TRAIT;
+  st.style.color = hasSkill ? '#a78bfa' : '#5a6b80';
 
   document.getElementById('monHpBar').style.width = (pct*100) + '%';
-  document.getElementById('monHpTxt').textContent = `${Math.max(0,Math.ceil(monHp))} / ${m.hpMax}`;
+  document.getElementById('monHpTxt').textContent = Math.max(0, Math.ceil(R.monHp)) + ' / ' + R.monHpMax;
 
   const mePct = Math.max(0, S.hp / D.hpMax);
   document.getElementById('meHpBar').style.width = (mePct*100) + '%';
-  document.getElementById('meHpBar').style.background = mePct < .3
+  document.getElementById('meHpBar').style.background = mePct < 0.3
     ? 'linear-gradient(90deg,#a33,#e08080)' : 'linear-gradient(90deg,#3f8f5f,#7dd3a0)';
-  const meTxt = document.getElementById('meHpTxt');
-  if(meTxt) meTxt.textContent = `你 ${Math.ceil(S.hp)} / ${D.hpMax}`;
+  document.getElementById('meHpTxt').textContent = '你 ' + Math.ceil(S.hp) + ' / ' + D.hpMax;
+
+  const sb = document.getElementById('shieldBar');
+  if(R.shield > 0){
+    sb.style.display = 'block';
+    document.getElementById('shieldFill').style.width = Math.min(100, R.shield/D.hpMax*100) + '%';
+  } else sb.style.display = 'none';
 
   document.getElementById('sAtk').textContent = D.atk;
-  document.getElementById('sHp').textContent = `${Math.ceil(S.hp)} / ${D.hpMax}`;
+  document.getElementById('sHp').textContent = Math.ceil(S.hp) + ' / ' + D.hpMax;
   document.getElementById('sCrit').textContent = D.crit + '%';
-  const essRate = (m.ess * D.essBonus) / Math.max(1, (m.hpMax / Math.max(1, D.atk * 1.1)) * (D.atkInterval/1000) + 1.5);
-  document.getElementById('sEss').textContent = essRate.toFixed(1);
 
-  // 升级按钮
+  const cnt = slotCount();
+  document.getElementById('slotHint').textContent = cnt + ' / 3 槽位';
+  const sl = document.getElementById('slotList');
+  sl.innerHTML = S.slots.map(function(s, i){
+    if(i >= cnt){
+      return '<div class="slot locked"><div class="sicon">🔒</div>' +
+        '<div class="sinfo"><div class="sname none">未解锁</div>' +
+        '<div class="scond">吞噬 ' + SLOT_UNLOCK[i-1] + ' 个技能解锁</div></div></div>';
+    }
+    if(!s.skill){
+      return '<div class="slot empty" onclick="openPicker(' + i + ')"><div class="sicon">＋</div>' +
+        '<div class="sinfo"><div class="sname none">空槽位</div>' +
+        '<div class="scond">点击配置技能与触发条件</div></div><div class="sarrow">›</div></div>';
+    }
+    const sk = SKILLS[s.skill];
+    return '<div class="slot" onclick="openPicker(' + i + ')"><div class="sicon">' + sk.icon + '</div>' +
+      '<div class="sinfo"><div class="sname">' + sk.name + '</div>' +
+      '<div class="scond">' + CONDS[s.cond].label + '</div></div><div class="sarrow">›</div></div>';
+  }).join('');
+
   const costs = {
-    atk: Math.round(10 * Math.pow(1.22, S.upAtkLv)),
-    hp:  Math.round(10 * Math.pow(1.22, S.upHpLv)),
-    crit:Math.round(25 * Math.pow(1.55, S.upCritLv)),
+    atk: Math.round(12*Math.pow(1.24, S.upAtkLv)),
+    hp:  Math.round(12*Math.pow(1.24, S.upHpLv)),
+    crit:Math.round(30*Math.pow(1.60, S.upCritLv)),
+    speed:Math.round(40*Math.pow(1.45, S.spdLv)),
   };
   setBtn('uAtk', costs.atk, 'cAtk');
   setBtn('uHp', costs.hp, 'cHp');
   setBtn('uCrit', costs.crit, 'cCrit');
-  const autoBtn = document.getElementById('uAuto');
-  if(S.autoUnlocked){
-    autoBtn.disabled = true;
-    autoBtn.querySelector('.cost').textContent = '已解锁';
-    autoBtn.classList.add('can');
-  } else {
-    const can = S.ess >= 60;
-    autoBtn.disabled = !can;
-    autoBtn.classList.toggle('can', can);
-  }
+  setBtn('uSpeed', costs.speed, 'cSpeed');
 
-  // 图鉴
-  const tl = document.getElementById('traitList');
-  const rows = [];
-  FLOORS.forEach((fl, fi) => {
-    fl.monsters.forEach(mo => {
-      const unlocked = S.traits.includes(mo.trait.name);
-      const k = S.kills[mo.name] || 0;
-      const visible = fi <= S.floorIdx;
-      if(!visible) return;
-      rows.push(`<div class="trait ${unlocked?'':'locked'}">
-        <div class="icon">${mo.trait.icon}</div>
-        <div class="body">
-          <div class="tname">${mo.trait.name}</div>
-          <div class="tdesc">${mo.trait.desc}</div>
-          ${unlocked ? '' : `<div class="prog">${mo.name} · ${Math.min(k,KILLS_PER_TRAIT)}/${KILLS_PER_TRAIT}</div>`}
-        </div></div>`);
-    });
-  });
-  tl.innerHTML = rows.length ? rows.join('') : '<div class="trait locked"><div class="body"><div class="tdesc">尚未遇到任何怪物</div></div></div>';
-
-  document.getElementById('btnAttack').disabled = dead;
-  document.getElementById('btnNext').disabled = S.floorIdx >= FLOORS.length - 1 && S.monIdx >= FLOORS[S.floorIdx].monsters.length - 1;
+  document.getElementById('autoTxt').textContent = R.dead ? '恢复中…' : '自动战斗中';
 }
 
 function setBtn(id, cost, costId){
@@ -516,73 +590,110 @@ function setBtn(id, cost, costId){
 }
 
 // ============================================================
+// 槽位配置面板
+// ============================================================
+window.openPicker = function(slotIdx){
+  const slot = S.slots[slotIdx];
+  const owned = S.skills;
+  const taken = {};
+  S.slots.forEach(function(s, i){ if(i !== slotIdx && s.skill) taken[s.skill] = true; });
+
+  let html = '<h4>槽位 ' + (slotIdx+1) + ' · 技能</h4>';
+  if(owned.length === 0){
+    html += '<div class="opt lock"><div class="ot">还没有吞噬任何技能' +
+      '<div class="od">把同类怪物击杀 10 只即可吞噬</div></div></div>';
+  } else {
+    owned.forEach(function(id){
+      const sk = SKILLS[id];
+      const isTaken = !!taken[id];
+      html += '<div class="opt ' + (slot.skill === id ? 'sel' : '') + ' ' + (isTaken ? 'lock' : '') + '" ' +
+        (isTaken ? '' : 'onclick="setSlotSkill(' + slotIdx + ',\'' + id + '\')"') + '>' +
+        '<div class="oi">' + sk.icon + '</div>' +
+        '<div class="ot">' + sk.name + '<div class="od">' + sk.desc + '</div></div>' +
+        '<div class="od">' + (isTaken ? '已在其它槽' : 'CD ' + (sk.cd/1000) + 's') + '</div></div>';
+    });
+  }
+  html += '<h4 style="margin-top:16px">触发条件</h4>';
+  Object.keys(CONDS).forEach(function(k){
+    html += '<div class="opt ' + (slot.cond === k ? 'sel' : '') + '" onclick="setSlotCond(' + slotIdx + ',\'' + k + '\')">' +
+      '<div class="oi">◈</div><div class="ot">' + CONDS[k].label + '</div></div>';
+  });
+  html += '<div class="opt" onclick="clearSlot(' + slotIdx + ')"><div class="oi">✕</div>' +
+    '<div class="ot">清空此槽位</div></div>' +
+    '<button class="close" onclick="closePicker()">完成</button>';
+
+  document.getElementById('sheet').innerHTML = html;
+  document.getElementById('overlay').classList.add('on');
+};
+
+window.setSlotSkill = function(i, id){
+  S.slots.forEach(function(s, idx){ if(idx !== i && s.skill === id) s.skill = null; });
+  S.slots[i].skill = id;
+  render(); save();
+  log('【战术】槽位 ' + (i+1) + ' 配置为 ' + SKILLS[id].name, 'c-skill');
+};
+window.setSlotCond = function(i, cond){ S.slots[i].cond = cond; render(); save(); };
+window.clearSlot = function(i){ S.slots[i].skill = null; render(); save(); };
+window.closePicker = function(){ document.getElementById('overlay').classList.remove('on'); };
+
+// ============================================================
 // 交互
 // ============================================================
-document.getElementById('btnAttack').onclick = () => { playerHit(); };
-
-document.getElementById('uAtk').onclick = () => {
-  const c = Math.round(10 * Math.pow(1.22, S.upAtkLv));
+document.getElementById('uAtk').onclick = function(){
+  const c = Math.round(12*Math.pow(1.24, S.upAtkLv));
   if(S.ess < c) return;
-  S.ess -= c; S.upAtkLv++; S.atk += 2;
-  render(); save();
+  S.ess -= c; S.upAtkLv++; S.atk += 2; render(); save();
 };
-document.getElementById('uHp').onclick = () => {
-  const c = Math.round(10 * Math.pow(1.22, S.upHpLv));
+document.getElementById('uHp').onclick = function(){
+  const c = Math.round(12*Math.pow(1.24, S.upHpLv));
   if(S.ess < c) return;
-  S.ess -= c; S.upHpLv++; S.hpMax += 10; S.hp += 10;
-  render(); save();
+  S.ess -= c; S.upHpLv++; S.hpMax += 10; S.hp += 10; render(); save();
 };
-document.getElementById('uCrit').onclick = () => {
-  const c = Math.round(25 * Math.pow(1.55, S.upCritLv));
+document.getElementById('uCrit').onclick = function(){
+  const c = Math.round(30*Math.pow(1.60, S.upCritLv));
   if(S.ess < c) return;
-  S.ess -= c; S.upCritLv++; S.crit += 1;
-  render(); save();
+  S.ess -= c; S.upCritLv++; S.crit += 1; render(); save();
 };
-document.getElementById('uAuto').onclick = () => {
-  if(S.autoUnlocked || S.ess < 60) return;
-  S.ess -= 60; S.autoUnlocked = true;
-  log('【系统】自动攻击已激活', 'c-epic');
-  render(); save();
+document.getElementById('uSpeed').onclick = function(){
+  const c = Math.round(40*Math.pow(1.45, S.spdLv));
+  if(S.ess < c) return;
+  S.ess -= c; S.spdLv++; render(); save();
 };
 
-document.getElementById('btnNext').onclick = () => {
+document.getElementById('btnNext').onclick = function(){
   const f = FLOORS[S.floorIdx];
   if(S.monIdx < f.monsters.length - 1){
     S.monIdx++;
   } else if(S.floorIdx < FLOORS.length - 1){
     S.floorIdx++; S.monIdx = 0;
-    log(`【进入】${FLOORS[S.floorIdx].name}（${FLOORS[S.floorIdx].tier} 级）`, 'c-epic');
-  } else {
-    log('已到达当前版本最深处。');
-    return;
-  }
-  initMonster(); save();
+    log('【进入】' + FLOORS[S.floorIdx].name + '（' + FLOORS[S.floorIdx].tier + ' 级）', 'c-epic');
+  } else { log('已到达当前版本最深处。'); return; }
+  startFight(); save();
 };
 
-document.getElementById('btnReset').onclick = () => {
+document.getElementById('btnReset').onclick = function(){
   if(!confirm('确认重置全部进度？此操作不可撤销。')) return;
   localStorage.removeItem(SAVE_KEY);
-  S = freshState();
-  initMonster(); render(); save();
+  S = freshState(); R.cds = {};
+  startFight(); save();
   log('进度已重置。');
 };
 
-// 键盘/空格支持（电脑上摸鱼）
-document.addEventListener('keydown', e => {
-  if(e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); playerHit(); }
-});
+document.getElementById('overlay').onclick = function(e){
+  if(e.target.id === 'overlay') closePicker();
+};
 
 // ============================================================
 // 启动
 // ============================================================
 function boot(){
   const had = load();
-  initMonster();
+  startFight();
   if(had){
-    log('【系统】读取存档成功，从上次的位置继续。');
+    log('【系统】读取存档，继续自动战斗。');
   } else {
-    log('【系统】裂隙降临。你的吞噬系系统已激活。');
-    log('击杀同类怪物 10 只，即可吞噬其特性。');
+    log('【系统】裂隙降临。战斗已全自动。');
+    log('吞噬同类 10 只 → 习得技能 → 到「战术」里配触发条件。');
   }
   render();
   requestAnimationFrame(loop);
