@@ -272,14 +272,7 @@ function floorDef(f){            // f 从 0 开始
   const essMul = Math.pow(CFG.essGrow, depth);
   const grade = ['F','E','D','C','B','A','S','SS','SSS'][Math.min(8, Math.floor(depth/8))];
   // 词缀：第 4 层起每层 1 个，第 10 层起 2 个（轮换，保证每层有辨识度）
-  const aff = [];
-  const N = AFFIX_ORDER.length;
-  if(f >= 3) aff.push(AFFIX_ORDER[f % N]);
-  if(f >= 9){
-    let second = AFFIX_ORDER[(f*5 + 3) % N];
-    if(second === aff[0]) second = AFFIX_ORDER[(f*5 + 4) % N];
-    aff.push(second);
-  }
+  const aff = pickAffixes(f);
   const mons = [];
   for(let i=0;i<3;i++){
     const tpl = TEMPLATES[(f*3 + i) % 9];
@@ -356,7 +349,7 @@ const CFG = {
 // 敌人词缀：只改行为，不改数值
 // ============================================================
 const AFFIXES = {
-  thorns:  {name:'反伤', icon:'🛡', desc:'被打中时反弹伤害（上限为你最大生命的 8%）'},
+  thorns:  {name:'反伤', icon:'🛡', desc:'被打中时反弹伤害（上限为你最大生命的 5%）'},
   regen:   {name:'再生', icon:'♻️', desc:'每 4 秒回复自身 6% 生命'},
   enrage:  {name:'狂暴', icon:'⚡', desc:'自身生命低于 35% 时攻击力 ×2'},
   immune:  {name:'免疫', icon:'🧊', desc:'开战后 3 秒内免疫伤害'},
@@ -364,6 +357,35 @@ const AFFIXES = {
   burn:    {name:'灼烧', icon:'🔥', desc:'攻击附加 3 秒灼烧'},
 };
 const AFFIX_ORDER = ['thorns','regen','enrage','immune','leech','burn'];
+
+// 按层抽词缀：同层固定（可记忆、可规划），跨层不同（不可预测）
+function seededRand(seed){
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+function pickAffixes(f){
+  if(f < 3) return [];
+  const n = f < 12 ? 1 : 2;   // 12 层前只挂 1 个，避免早期双词缀劝退
+  const pool = AFFIX_ORDER.slice();
+  const out = [];
+  for(let i=0;i<n;i++){
+    const idx = Math.floor(seededRand(f*13 + i*7 + 3) * pool.length) % pool.length;
+    out.push(pool.splice(idx,1)[0]);
+  }
+  return out;
+}
+
+// ============================================================
+// 裂隙事件（每 5 层一次，三选一，风险换收益）
+// ============================================================
+const EVENTS = [
+  {id:'tide',      name:'狂潮', icon:'🌊', desc:'本层怪物生命 ×1.6，精华 ×2.2',   mod:{hp:1.6, ess:2.2}},
+  {id:'thin',      name:'瘠薄', icon:'🍂', desc:'本层怪物生命 ×0.7，精华 ×0.6',   mod:{hp:0.7, ess:0.6}},
+  {id:'sacrifice', name:'献祭', icon:'🩸', desc:'立刻失去 30% 生命，本层精华 ×3', mod:{ess:3.0}, cost:'hp30'},
+  {id:'echo',      name:'残响', icon:'🌀', desc:'尝试吞噬一个未习得技能（30% 失败）', mod:{}, special:'echo'},
+  {id:'purge',     name:'净化', icon:'✨', desc:'本层去掉全部词缀，精华 ×0.5',    mod:{ess:0.5, noAffix:true}},
+  {id:'raid',      name:'掠夺', icon:'⚔️', desc:'本层怪物攻击 ×1.5，精华 ×1.8',   mod:{atk:1.5, ess:1.8}},
+];
 
 const KILLS_PER_TRAIT = 10;
 const SLOT_UNLOCK = [4, 7];
@@ -384,6 +406,7 @@ function freshState(){
     atk:5, hpMax:50, hp:50, crit:5, spdLv:0,
     upAtkLv:0, upHpLv:0, upCritLv:0,
     autoAdv:true, bestFloor:0,
+    evMod:null, evFloor:-1,
     eps:0.5, lastSeen:Date.now(), offSum:null,
   };
 }
@@ -402,7 +425,8 @@ const R = {
   cds:{},
   fightStart:0, fightSkillUses:0,
   fightId:0, slKey:'', reviveAt:0,
-  regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0,
+  paused:false, evOpts:[], evUntil:0,
+  regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0, affixSuppress:false,
   killGate:0,               // 自动推进：本层已杀多少只
   dead:false,
 };
@@ -420,11 +444,15 @@ function curMon(){
   const atkMult = e.atkMult || mult;
   const essMult = e.essMult || mult;
   // 同层怪不再随击杀变强：难度只由层数决定
+  const ev = (S.evFloor === S.floorIdx && S.evMod) ? S.evMod : {};
+  const evHp = ev.hp || 1, evAtk = ev.atk || 1, evEss = ev.ess || 1;
+  let aff = R.forceAffixes || e.affixes || [];
+  if(ev.noAffix || R.affixSuppress) aff = [];
   return {name:t.name, emoji:t.emoji, skill:t.skill,
-    affixes: R.forceAffixes || e.affixes || [],
-    hpMax: Math.round(t.hp * mult),
-    atk: Math.round(t.atk * atkMult),
-    ess: Math.round(t.ess * essMult)};
+    affixes: aff,
+    hpMax: Math.round(t.hp * mult * evHp),
+    atk: Math.round(t.atk * atkMult * evAtk),
+    ess: Math.round(t.ess * essMult * evEss)};
 }
 
 // ---------- 派生 ----------
@@ -544,7 +572,7 @@ function damageMonster(dmg, tag){
   // 反伤：按伤害比例反弹，但设上限，避免高伤害自杀
   if((m.affixes||[]).indexOf('thorns') >= 0 && dmg > 0){
     const D2 = derived();
-    const back = Math.min(Math.round(dmg*0.18), Math.round(D2.hpMax*0.08));
+    const back = Math.min(Math.round(dmg*0.18), Math.round(D2.hpMax*0.05));
     if(back > 0 && !R.dead){
       S.hp -= back;
       floatDmg('反 ' + fmt(back), 'crit');
@@ -638,6 +666,65 @@ function killMonster(){
   startFight(); save();
 }
 
+function maybeEvent(){
+  const f = S.floorIdx + 1;
+  if(f % 5 !== 0 || f < 5) return;
+  const pool = EVENTS.slice();
+  const opts = [];
+  for(let i=0;i<3 && pool.length;i++){
+    const idx = Math.floor(seededRand(f*31 + i*17 + 5) * pool.length) % pool.length;
+    opts.push(pool.splice(idx,1)[0]);
+  }
+  R.evOpts = opts;
+  R.evUntil = now() + 15000;          // 15 秒不选，自动挑最稳的
+  R.paused = true;
+  const sheet = document.getElementById('sheet');
+  if(sheet){
+    sheet.innerHTML = optionsHTML(opts);
+    document.getElementById('overlay').classList.add('on');
+  }
+  markDirty();
+}
+
+function optionsHTML(opts){
+  return '<h4>裂隙事件 · 第 ' + (S.floorIdx+1) + ' 层</h4>' +
+    '<div class="od" style="color:#5a6b80;font-size:11px;margin-bottom:10px">' +
+    '15 秒不选将自动选择最稳的一项</div>' +
+    opts.map(function(o,i){
+      return '<div class="opt" onclick="chooseEvent(' + i + ')">' +
+        '<div class="oi">' + o.icon + '</div>' +
+        '<div class="ot">' + o.name + '<div class="od">' + o.desc + '</div></div></div>';
+    }).join('') +
+    '<div class="od" id="evCountdown" style="text-align:center;color:#7aa2f7;margin-top:8px"></div>';
+}
+
+window.chooseEvent = function(i){
+  const o = R.evOpts[i];
+  if(!o) return;
+  R.paused = false;
+  R.evOpts = [];
+  closePicker();
+  S.evFloor = S.floorIdx;
+  S.evMod = Object.assign({}, o.mod);
+  if(o.cost === 'hp30'){
+    S.hp = Math.max(1, Math.round(S.hp * 0.7));
+  }
+  if(o.special === 'echo'){
+    const missing = TEMPLATES.map(function(t){ return t.skill; })
+      .filter(function(k){ return S.skills.indexOf(k) < 0; });
+    if(!missing.length || Math.random() < 0.3){
+      log('【残响】吞噬失败，什么都没得到', 'c-bad');
+    } else {
+      const got = missing[Math.floor(Math.random()*missing.length)];
+      S.skills.push(got);
+      flash(); toast('吞噬完成 · ' + SKILLS[got].name);
+      log('【残响】直接习得技能：' + SKILLS[got].name, 'c-epic');
+    }
+  }
+  log('【事件】' + o.icon + ' ' + o.name + ' —— ' + o.desc, 'c-skill');
+  startFight(); save();
+};
+
 function advance(silent){
   const f = curFloor();
   if(S.floorIdx > S.bestFloor) S.bestFloor = S.floorIdx;
@@ -646,6 +733,7 @@ function advance(silent){
   } else {
     S.floorIdx = Math.min(CFG.floorCap-1, S.floorIdx+1); S.monIdx = 0;
     if(S.floorIdx > S.bestFloor){ S.bestFloor = S.floorIdx; R.slowNoticed = false; }
+    R.affixSuppress = false;
     const nf = curFloor();
     if(nf.affixes && nf.affixes.length){
       log('【词缀】' + nf.affixes.map(function(k){ return AFFIXES[k].icon + AFFIXES[k].name; }).join(' + ') +
@@ -655,7 +743,9 @@ function advance(silent){
     else log('【深入】进入 ' + curFloor().name + '（' + curFloor().tier + '）', 'c-epic');
   }
   R.killGate = 0;
-  startFight(); save();
+  startFight();
+  maybeEvent();
+  save();
 }
 
 function monsterAttack(){
@@ -689,12 +779,11 @@ function monsterAttack(){
     R.reviveAt = now() + 1500;
     R.deaths = (R.deaths || 0) + 1;
     log('【重伤】被 ' + m.name + ' 击退，回营地恢复', 'c-bad');
-    if(R.deaths >= 3){
+    if(R.deaths >= 3 && !R.affixSuppress){
       R.deaths = 0;
-      if(S.monIdx > 0) S.monIdx--;
-      else if(S.floorIdx > 0){ S.floorIdx--; S.monIdx = curFloor().monsters.length - 1; }
-      R.killGate = 0;
-      log('【回退】这一层打不动，回到上一层刷精华', 'c-bad');
+      R.affixSuppress = true;
+      log('【洞察】你摸清了这只怪的规律，本层词缀暂时失效', 'c-epic');
+      R.monHp = curMon().hpMax; R.monHpMax = curMon().hpMax;
       setTimeout(function(){ R.monHp = curMon().hpMax; R.monHpMax = curMon().hpMax; }, 0);
     }
     render(); dirty = false; lastRender = now();
@@ -768,6 +857,21 @@ function checkSkills(){
 
 // ---------- 单步推进（真实循环与离线模拟共用） ----------
 function tick(dt){
+  if(R.paused){
+    const cd = document.getElementById('evCountdown');
+    if(!SILENT && cd){
+      const left = Math.max(0, Math.ceil((R.evUntil - now())/1000));
+      cd.textContent = '自动选择倒计时 ' + left + ' 秒';
+    }
+    if(now() >= R.evUntil){
+      // 默认挑一个不带代价的（瘠薄 > 狂潮 > 第一个）
+      let pick = R.evOpts.findIndex(function(o){ return o.id === 'thin'; });
+      if(pick < 0) pick = R.evOpts.findIndex(function(o){ return !o.cost; });
+      if(pick < 0) pick = 0;
+      chooseEvent(pick);
+    }
+    return;
+  }
   if(R.dead){
     if(now() >= R.reviveAt){
       R.dead = false;
@@ -857,7 +961,9 @@ function render(){
   // 词缀标签
   const ar = document.getElementById('affixRow');
   const affs = m.affixes || [];
-  const affKey = affs.join(',');
+  const evTag = (S.evFloor === S.floorIdx && S.evMod)
+    ? 'ev' + JSON.stringify(S.evMod) : '';
+  const affKey = affs.join(',') + '|' + evTag;
   if(ar.dataset.k !== affKey){
     ar.dataset.k = affKey;
     ar.innerHTML = affs.map(function(k){
@@ -866,7 +972,19 @@ function render(){
         'background:rgba(224,128,128,.12);border:1px solid rgba(224,128,128,.35);color:#e8b0b0">' +
         a.icon + ' ' + a.name + '</span>';
     }).join('');
-    ar.title = affs.map(function(k){ return AFFIXES[k].name + '：' + AFFIXES[k].desc; }).join('\n');
+    const evMod = (S.evFloor === S.floorIdx && S.evMod) ? S.evMod : null;
+    let extra = '';
+    if(evMod){
+      const bits = [];
+      if(evMod.hp) bits.push('生命×' + evMod.hp);
+      if(evMod.atk) bits.push('攻击×' + evMod.atk);
+      if(evMod.ess) bits.push('精华×' + evMod.ess);
+      if(evMod.noAffix) bits.push('无词缀');
+      extra = '<span style="font-size:10.5px;padding:3px 8px;border-radius:20px;' +
+        'background:rgba(122,162,247,.12);border:1px solid rgba(122,162,247,.35);color:#a8c4f0">' +
+        '◆ ' + bits.join(' ') + '</span>';
+    }
+    ar.innerHTML = ar.innerHTML + extra;
   }
 
   document.getElementById('monHpBar').style.width = (pct*100) + '%';
