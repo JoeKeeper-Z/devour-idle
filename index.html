@@ -21,6 +21,7 @@ body{
   border-radius:10px;margin-bottom:10px;font-size:13px}
 .topbar .ess{color:#7dd3a0;font-weight:600}
 .topbar .floor{color:#7aa2f7}
+.topbar .realm{color:#c4a5ff;font-weight:700}
 
 .monster{background:linear-gradient(180deg,#141d2b 0%,#0f1620 100%);
   border:1px solid #1e2b3d;border-radius:14px;padding:14px;margin-bottom:10px;
@@ -37,6 +38,7 @@ body{
 .bar-fill{height:100%;transition:width .18s linear;border-radius:5px}
 .bar-fill.hp-mon{background:linear-gradient(90deg,#e05252,#f28b8b)}
 .bar-fill.hp-me{background:linear-gradient(90deg,#3f8f5f,#7dd3a0)}
+.bar-fill.exp{background:linear-gradient(90deg,#6b4fbf,#a78bfa)}
 .bar-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:600;color:#e6edf7;text-shadow:0 1px 2px #000}
 .bar.shield{height:6px;margin-top:-3px;margin-bottom:8px;border-color:#2b3f5c}
@@ -96,11 +98,12 @@ body{
   backdrop-filter:blur(12px);z-index:10}
 .bottom button{flex:1;padding:11px;border-radius:9px;border:1px solid #22303f;
   background:#16202e;color:#8a9bb0;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.bottom button.on{border-color:#3f8f5f;color:#a7e3bd;background:rgba(63,143,95,.15)}
 .bottom button:active{transform:scale(.96)}
 
 @keyframes floatUp{0%{opacity:1;transform:translate(-50%,0) scale(1)}
   100%{opacity:0;transform:translate(-50%,-46px) scale(1.15)}}
-.dmg{position:absolute;left:50%;top:40%;font-size:19px;font-weight:800;
+.dmg{position:absolute;left:50%;top:56%;font-size:17px;font-weight:800;
   pointer-events:none;animation:floatUp .75s ease-out forwards;z-index:5;
   text-shadow:0 2px 6px #000}
 .dmg.crit{font-size:26px;color:#ffd166}
@@ -134,14 +137,30 @@ body{
 .sheet .close{width:100%;padding:12px;border-radius:9px;border:1px solid #22303f;
   background:#16202e;color:#8a9bb0;font-size:13px;font-weight:600;margin-top:12px;
   cursor:pointer;font-family:inherit}
+
+/* 离线结算 */
+.offline{position:fixed;inset:0;background:rgba(4,7,11,.9);z-index:60;
+  display:none;align-items:center;justify-content:center;padding:24px}
+.offline.on{display:flex}
+.offcard{width:100%;max-width:340px;background:#0f1620;border:1px solid #22303f;
+  border-radius:16px;padding:22px 18px;text-align:center}
+.offcard h2{font-size:16px;color:#c4a5ff;margin-bottom:6px}
+.offcard .sub{font-size:11.5px;color:#5a6b80;margin-bottom:16px}
+.offcard .big{font-size:26px;font-weight:800;color:#7dd3a0;margin:6px 0}
+.offcard .line{font-size:12.5px;color:#8a9bb0;margin:4px 0;display:flex;
+  justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(30,43,61,.6)}
+.offcard button{width:100%;margin-top:16px;padding:12px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#7a5cd6,#3d6fd6);color:#fff;font-size:14px;
+  font-weight:700;cursor:pointer;font-family:inherit}
 </style>
 </head>
 <body>
 <div id="app">
 
   <div class="topbar">
+    <div><span class="realm" id="realmName">觉醒者</span> Lv.<span id="lvNum">1</span></div>
     <div>精华 <span class="ess" id="ess">0</span></div>
-    <div>裂隙 <span class="floor" id="floorName">F</span> · 第<span id="floorIdx">1</span>层</div>
+    <div>第<span class="floor" id="floorIdx">1</span>层</div>
   </div>
 
   <div class="monster" id="monsterCard">
@@ -159,6 +178,16 @@ body{
   <div class="auto-tag"><span class="dot"></span><span id="autoTxt">自动战斗中</span></div>
 
   <div class="panel">
+    <h3>修行 <span class="hint" id="realmHint">觉醒者 · 距突破 10 级</span></h3>
+    <div class="bar" style="height:14px"><div class="bar-fill exp" id="expBar" style="width:0%"></div>
+      <div class="bar-txt" id="expTxt">0 / 20 经验</div></div>
+    <div class="row"><span class="k">境界加成</span><span class="v" id="realmMul">×1.00</span></div>
+    <div class="row"><span class="k">攻击倍率</span><span class="v" id="atkMul">×1.00</span></div>
+    <div class="row"><span class="k">精华倍率</span><span class="v" id="essMul">×1.00</span></div>
+    <div class="row"><span class="k">裂隙共鸣</span><span class="v" id="riftMul">×1.00</span></div>
+  </div>
+
+  <div class="panel">
     <h3>战术 <span class="hint" id="slotHint">1 / 3 槽位</span></h3>
     <div id="slotList"></div>
   </div>
@@ -168,6 +197,7 @@ body{
     <div class="row"><span class="k">攻击力</span><span class="v" id="sAtk">5</span></div>
     <div class="row"><span class="k">生命</span><span class="v" id="sHp">50 / 50</span></div>
     <div class="row"><span class="k">暴击率</span><span class="v" id="sCrit">5%</span></div>
+    <div class="row"><span class="k">每秒精华</span><span class="v" id="sEps">0.0</span></div>
     <div class="row"><span class="k">上一战</span><span class="v" id="sLast">—</span></div>
   </div>
 
@@ -189,38 +219,66 @@ body{
 </div>
 
 <div class="bottom">
-  <button id="btnNext">深入下一层</button>
-  <button id="btnReset">重置</button>
+  <button id="btnNext">下一只</button>
+  <button id="btnAuto" class="on">自动推进：开</button>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="sheet" id="sheet"></div>
 </div>
 
+<div class="offline" id="offlineBox">
+  <div class="offcard">
+    <h2>欢迎回来</h2>
+    <div class="sub" id="offSub">离线期间，裂隙里没停过。</div>
+    <div class="big" id="offEss">+0 精华</div>
+    <div class="line"><span>离线时长</span><span id="offTime">—</span></div>
+    <div class="line"><span>经验</span><span id="offExp">+0</span></div>
+    <div class="line"><span>效率</span><span>50%</span></div>
+    <button onclick="closeOffline()">收下</button>
+  </div>
+</div>
+
 <script>
 // ============================================================
-// 怪物表
+// 怪物模板（9 种，全部技能来源）
 // ============================================================
-const FLOORS = [
-  { tier:'F', name:'微光裂隙', monsters:[
-    {name:'铁皮鼠', emoji:'🐀', hp:20,  atk:2, ess:3,  skill:'harden'},
-    {name:'腐骨犬', emoji:'🐕', hp:34,  atk:3, ess:4,  skill:'bloodthirst'},
-    {name:'灰翼蝠', emoji:'🦇', hp:44,  atk:4, ess:5,  skill:'haste'},
-  ]},
-  { tier:'E', name:'锈蚀裂隙', monsters:[
-    {name:'幽影狼', emoji:'🐺', hp:78,  atk:7, ess:8,  skill:'rend'},
-    {name:'熔岩蛛', emoji:'🕷', hp:110, atk:9, ess:10, skill:'venom'},
-    {name:'石甲蜥', emoji:'🦎', hp:165, atk:11,ess:13, skill:'ironwall'},
-  ]},
-  { tier:'D', name:'深核裂隙', monsters:[
-    {name:'电光隼', emoji:'🦅', hp:240, atk:16,ess:18, skill:'triple'},
-    {name:'骨刺巨像', emoji:'💀', hp:340, atk:21,ess:22, skill:'crush'},
-    {name:'虚空之眼', emoji:'👁', hp:470, atk:26,ess:28, skill:'soul'},
-  ]},
+const TEMPLATES = [
+  {name:'铁皮鼠',   emoji:'🐀', hp:20,  atk:2,  ess:3,  skill:'harden'},
+  {name:'腐骨犬',   emoji:'🐕', hp:34,  atk:3,  ess:4,  skill:'bloodthirst'},
+  {name:'灰翼蝠',   emoji:'🦇', hp:44,  atk:4,  ess:5,  skill:'haste'},
+  {name:'幽影狼',   emoji:'🐺', hp:78,  atk:7,  ess:8,  skill:'rend'},
+  {name:'熔岩蛛',   emoji:'🕷', hp:110, atk:9,  ess:10, skill:'venom'},
+  {name:'石甲蜥',   emoji:'🦎', hp:165, atk:11, ess:13, skill:'ironwall'},
+  {name:'电光隼',   emoji:'🦅', hp:240, atk:16, ess:18, skill:'triple'},
+  {name:'骨刺巨像', emoji:'💀', hp:340, atk:21, ess:22, skill:'crush'},
+  {name:'虚空之眼', emoji:'👁', hp:470, atk:26, ess:28, skill:'soul'},
 ];
 
+// 前 3 层：原始 3 只一组；第 4 层起按模板自动生成
+const FLOOR_NAMES = ['微光裂隙','锈蚀裂隙','深核裂隙'];
+
+function floorDef(f){            // f 从 0 开始
+  const lvl = f + 1;
+  if(f < 3){
+    return {tier:['F','E','D'][f], name:FLOOR_NAMES[f],
+      monsters: TEMPLATES.slice(f*3, f*3+3).map(function(t){ return {tpl:t, mult:1}; })};
+  }
+  const depth = f - 2;                       // 第 4 层 = 1
+  const hpMul  = Math.pow(CFG.hpGrow, depth);
+  const atkMul = Math.pow(CFG.monAtkGrow, depth);
+  const essMul = Math.pow(CFG.essGrow, depth);
+  const grade = ['F','E','D','C','B','A','S','SS','SSS'][Math.min(8, Math.floor(depth/8))];
+  const mons = [];
+  for(let i=0;i<3;i++){
+    const tpl = TEMPLATES[(f*3 + i) % 9];
+    mons.push({tpl:tpl, mult:hpMul, atkMult:atkMul, essMult:essMul});
+  }
+  return {tier:grade, name:'裂隙 · 第'+lvl+'层', monsters:mons};
+}
+
 // ============================================================
-// 技能表（吞噬获得）
+// 技能表
 // ============================================================
 const SKILLS = {
   harden:      {name:'硬化', icon:'🛡', cd:7000,  desc:'获得最大生命 20% 的护盾'},
@@ -242,9 +300,50 @@ const CONDS = {
   every3:   {label:'每 3 次普攻后',        test:function(c){ return c.atkCount > 0 && c.atkCount % 3 === 0; }},
 };
 
+// ============================================================
+// 境界（沿用世界观阶位表）
+// ============================================================
+const REALMS = [
+  {name:'觉醒者', from:1,  to:10,  mul:1.00, bonus:'—'},
+  {name:'精锐级', from:11, to:30,  mul:1.45, bonus:'全属性 +45%'},
+  {name:'战将级', from:31, to:50,  mul:2.10, bonus:'全属性 +110%'},
+  {name:'王级',   from:51, to:70,  mul:3.10, bonus:'全属性 +210%'},
+  {name:'帝级',   from:71, to:90,  mul:4.60, bonus:'全属性 +360%'},
+  {name:'神级',   from:91, to:100, mul:7.00, bonus:'全属性 +600%'},
+];
+const LV_MAX = 100;
+
+function realmOf(lv){
+  for(let i=REALMS.length-1;i>=0;i--) if(lv >= REALMS[i].from) return i;
+  return 0;
+}
+// 升级所需经验
+function expNeed(lv){ return Math.round(20 * Math.pow(CFG.expGrow, lv-1)); }
+
+// ============================================================
+// 数值配置（调平衡只改这里）
+// ============================================================
+const CFG = {
+  hpGrow:     1.16,   // 每深入 1 层，怪血量倍率（模拟调优值）
+  monAtkGrow: 1.09,   // 每深入 1 层，怪攻击倍率（必须远低于 hpGrow，否则变死亡循环）
+  essGrow:    1.11,   // 每深入 1 层，精华倍率（必须低于 hpGrow，否则滚雪球）
+  upCostGrow: 1.22,   // 升级花费倍率
+  upPowGrow:  1.03,   // 升级效果倍率（几何成长，防数值墙）
+  expGrow:    1.28,   // 每级所需经验成长
+  expRatio:   0.5,    // 经验 = 精华 × 系数
+  riftGrow:   1.08,   // 裂隙共鸣：每深入一层，永久全属性倍率（必须低于 hpGrow）
+  spdMax:     24,     // 攻速升级上限（0.92^24 ≈ 0.135）
+  critMax:    75,     // 暴击率上限
+  minInterval:160,    // 攻击间隔下限（毫秒），防止无限连击
+  advSecLimit:45,     // 单场超过这么多秒就原地刷，不再自动深入
+  floorCap:   999,
+};
+
 const KILLS_PER_TRAIT = 10;
 const SLOT_UNLOCK = [4, 7];
-const SAVE_KEY = 'devour_idle_v2';
+const SAVE_KEY = 'devour_idle_v3';
+const OFF_CAP_SEC = 8*3600;
+const OFF_RATE = 0.5;
 
 // ============================================================
 // 状态
@@ -252,12 +351,14 @@ const SAVE_KEY = 'devour_idle_v2';
 function freshState(){
   return {
     ess:0, totalEss:0,
+    lv:1, exp:0,
     floorIdx:0, monIdx:0,
     kills:{}, skills:[],
     slots:[{skill:null,cond:'always'},{skill:null,cond:'always'},{skill:null,cond:'always'}],
     atk:5, hpMax:50, hp:50, crit:5, spdLv:0,
     upAtkLv:0, upHpLv:0, upCritLv:0,
-    lastFight:null,
+    autoAdv:true, bestFloor:0,
+    eps:0.5, lastSeen:Date.now(), offSum:null,
   };
 }
 let S = null;
@@ -266,7 +367,7 @@ function slotCount(){
   return 1 + SLOT_UNLOCK.filter(function(n){ return S.skills.length >= n; }).length;
 }
 
-// ---------- 运行时（不入档） ----------
+// ---------- 运行时 ----------
 const R = {
   monHp:0, monHpMax:1,
   monTimer:0, atkTimer:0, atkCount:0,
@@ -274,40 +375,74 @@ const R = {
   hasteUntil:0, armorUntil:0, poisonUntil:0, poisonDps:0, poisonAcc:0,
   cds:{},
   fightStart:0, fightSkillUses:0,
-  fightId:0, slKey:'',
+  fightId:0, slKey:'', reviveAt:0,
+  killGate:0,               // 自动推进：本层已杀多少只
   dead:false,
 };
-
-// 脏标记：渲染合并到最多每 80ms 一次，避免每次都重建 DOM 造成卡顿
 let dirty = true, lastRender = 0;
 function markDirty(){ dirty = true; }
 
+// ---------- 当前层 / 当前怪 ----------
+function curFloor(){ return floorDef(S.floorIdx); }
+
 function curMon(){
-  const f = FLOORS[S.floorIdx], m = f.monsters[S.monIdx];
-  const k = S.kills[m.name] || 0;
-  const scale = 1 + Math.max(0, Math.floor(k / KILLS_PER_TRAIT) - 1) * 0.10;
-  return {name:m.name, emoji:m.emoji, skill:m.skill,
-    hpMax:Math.round(m.hp*scale), atk:Math.round(m.atk*scale), ess:Math.round(m.ess*scale)};
+  const f = curFloor();
+  const e = f.monsters[Math.min(S.monIdx, f.monsters.length-1)];
+  const t = e.tpl;
+  const mult = e.mult || 1;
+  const atkMult = e.atkMult || mult;
+  const essMult = e.essMult || mult;
+  // 同名怪击杀越多，重生时略强（10%），避免无限刷同一只
+  const k = S.kills[t.name] || 0;
+  const rep = 1 + Math.max(0, Math.floor(k / KILLS_PER_TRAIT) - 1) * 0.10;
+  return {name:t.name, emoji:t.emoji, skill:t.skill,
+    hpMax: Math.round(t.hp * mult * rep),
+    atk: Math.round(t.atk * atkMult * rep),
+    ess: Math.round(t.ess * essMult * Math.max(1, rep))};
 }
 
+// ---------- 派生 ----------
 function derived(){
   const has = function(id){ return S.skills.indexOf(id) >= 0; };
+  const lvMulA = 1 + 0.025*(S.lv-1);
+  const lvMulE = 1 + 0.012*(S.lv-1);
+  const rm = REALMS[realmOf(S.lv)].mul;
+  const rift = Math.pow(CFG.riftGrow, Math.max(0, S.bestFloor));
+  const total = rm * rift;
   return {
-    atk:S.atk,
-    hpMax:S.hpMax,
-    crit:S.crit,
+    atk: Math.round(S.atk * lvMulA * total),
+    hpMax: Math.round(S.hpMax * lvMulA * total),
+    crit: S.crit,
     critDmg: has('rend') ? 1.8 : 1.5,
-    atkInterval: 900 * Math.pow(0.92, S.spdLv),
+    atkInterval: Math.max(CFG.minInterval, 900 * Math.pow(0.92, S.spdLv)),
+    essMul: lvMulE * total,
+    atkMul: lvMulA * total,
+    realmMul: rm,
+    riftMul: rift,
   };
 }
 
 // ============================================================
 // 工具
 // ============================================================
-function now(){ return performance.now(); }
+let CLOCK = 0;                     // 快进模拟用的虚拟时钟偏移
+function now(){ return performance.now() + CLOCK; }
 
+// 大数显示：1.2万 / 3.4亿 / 5.6万亿
+function fmt(n){
+  n = Math.max(0, Math.round(n));
+  if(n < 10000) return String(n);
+  if(n < 1e8) return (n/1e4).toFixed(n<1e6?1:0) + '万';
+  if(n < 1e12) return (n/1e8).toFixed(n<1e10?1:0) + '亿';
+  if(n < 1e16) return (n/1e12).toFixed(1) + '万亿';
+  return (n/1e16).toFixed(2) + '京';
+}
+
+let SILENT = false;      // 快进模拟时关掉 DOM 输出
 function log(msg, cls){
+  if(SILENT) return;
   const el = document.getElementById('log');
+  if(!el) return;
   const d = document.createElement('div');
   if(cls) d.className = cls;
   d.textContent = msg;
@@ -315,19 +450,28 @@ function log(msg, cls){
   while(el.children.length > 50) el.removeChild(el.lastChild);
 }
 function floatDmg(text, kind){
+  if(SILENT) return;
+  const card = document.getElementById('monsterCard');
+  if(!card) return;
+  if(card.querySelectorAll('.dmg').length > 5) return;   // 同屏最多 6 个飘字
   const d = document.createElement('div');
   d.className = 'dmg ' + (kind || 'normal');
   d.textContent = text;
   d.style.left = (45 + Math.random()*10) + '%';
-  document.getElementById('monsterCard').appendChild(d);
+  card.appendChild(d);
   setTimeout(function(){ d.remove(); }, 800);
 }
-function flash(){ const f=document.createElement('div'); f.className='flash';
+function flash(){ if(SILENT) return; const f=document.createElement('div'); f.className='flash';
   document.body.appendChild(f); setTimeout(function(){f.remove();},950); }
-function toast(msg){ const t=document.createElement('div'); t.className='toast';
+function toast(msg){ if(SILENT) return; const t=document.createElement('div'); t.className='toast';
   t.textContent=msg; document.body.appendChild(t); setTimeout(function(){t.remove();},1850); }
 
-function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function save(){
+  try{
+    S.lastSeen = Date.now();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(S));
+  }catch(e){}
+}
 function load(){
   try{
     const raw = localStorage.getItem(SAVE_KEY);
@@ -344,7 +488,7 @@ function load(){
 }
 
 // ============================================================
-// 战斗核心
+// 战斗
 // ============================================================
 function startFight(){
   const m = curMon();
@@ -353,12 +497,13 @@ function startFight(){
   R.shield = 0;
   R.fightStart = now(); R.fightSkillUses = 0;
   R.fightId++;
-  render(); dirty = false; lastRender = now();
+  render();
+  dirty = false; lastRender = now();
 }
 
 function damageMonster(dmg, tag){
   R.monHp -= dmg;
-  floatDmg((tag ? tag + ' ' : '') + '-' + dmg, tag ? 'skill' : 'normal');
+  floatDmg((tag ? tag + ' ' : '') + '-' + fmt(dmg), tag ? 'skill' : 'normal');
   if(R.monHp <= 0){ R.monHp = 0; killMonster(); return true; }
   markDirty();
   return false;
@@ -372,19 +517,46 @@ function playerAttack(){
   damageMonster(dmg, isCrit ? '暴击' : '');
 }
 
+function gainExp(n){
+  S.exp += n;
+  let ups = 0;
+  while(S.lv < LV_MAX && S.exp >= expNeed(S.lv)){
+    S.exp -= expNeed(S.lv);
+    S.lv++;
+    S.hp = derived().hpMax;      // 升级回满（血量统一按有效值存）
+    ups++;
+    if(realmOf(S.lv) !== realmOf(S.lv-1)){
+      const rm = REALMS[realmOf(S.lv)];
+      flash(); toast('境界突破 · ' + rm.name);
+      log('【境界突破】' + rm.name + '（Lv.' + S.lv + '）' + rm.bonus, 'c-epic');
+    }
+  }
+  return ups;
+}
+
 function killMonster(){
   const m = curMon();
+  const D = derived();
   const dur = ((now() - R.fightStart)/1000).toFixed(1);
-  S.ess += m.ess; S.totalEss += m.ess;
+  const essGain = Math.round(m.ess * D.essMul);
+  const expGain = Math.max(1, Math.round(m.ess * CFG.expRatio));
+
+  S.ess += essGain; S.totalEss += essGain;
   S.kills[m.name] = (S.kills[m.name] || 0) + 1;
   const k = S.kills[m.name];
+  gainExp(expGain);
 
-  S.lastFight = {t:parseFloat(dur), name:m.name, uses:R.fightSkillUses};
+  // eps 平滑估计（给离线收益用）
+  const dtSec = Math.max(0.5, (now()-R.fightStart)/1000);
+  const inst = essGain / (dtSec + 1.7);
+  S.eps = S.eps*0.85 + inst*0.15;
+
   const lf = document.getElementById('sLast');
   if(lf) lf.textContent = dur + 's · ' + R.fightSkillUses + ' 技能';
 
-  log('击杀 ' + m.name + '｜' + dur + 's｜+' + m.ess + ' 精华｜技能 ' + R.fightSkillUses + ' 次', 'c-good');
+  log('击杀 ' + m.name + '｜' + dur + 's｜+' + fmt(essGain) + ' 精华｜+' + fmt(expGain) + ' 经验', 'c-good');
 
+  // 吞噬技能
   if(k === KILLS_PER_TRAIT && S.skills.indexOf(m.skill) < 0){
     S.skills.push(m.skill);
     const sk = SKILLS[m.skill];
@@ -395,6 +567,37 @@ function killMonster(){
       toast('战术槽位 +1');
     }
   }
+
+  // 自动推进：打得太慢就原地刷，不再硬顶
+  R.killGate++;
+  const tooSlow = parseFloat(dur) > CFG.advSecLimit;
+  if(S.autoAdv && R.killGate >= KILLS_PER_TRAIT && !tooSlow){
+    R.killGate = 0;
+    advance(true);
+    return;
+  }
+  if(tooSlow && R.killGate >= KILLS_PER_TRAIT){
+    R.killGate = 0;
+    if(!R.slowNoticed){
+      R.slowNoticed = true;
+      log('【停滞】这一层打得太慢，自动改为原地刷精华（攒够再推进）', 'c-bad');
+    }
+  }
+  startFight(); save();
+}
+
+function advance(silent){
+  const f = curFloor();
+  if(S.floorIdx > S.bestFloor) S.bestFloor = S.floorIdx;
+  if(S.monIdx < f.monsters.length - 1){
+    S.monIdx++;
+  } else {
+    S.floorIdx = Math.min(CFG.floorCap-1, S.floorIdx+1); S.monIdx = 0;
+    if(S.floorIdx > S.bestFloor){ S.bestFloor = S.floorIdx; R.slowNoticed = false; }
+    if(!silent) log('【进入】' + curFloor().name, 'c-epic');
+    else log('【深入】进入 ' + curFloor().name + '（' + curFloor().tier + '）', 'c-epic');
+  }
+  R.killGate = 0;
   startFight(); save();
 }
 
@@ -413,12 +616,17 @@ function monsterAttack(){
 
   if(S.hp <= 0){
     S.hp = 0; R.dead = true;
+    R.reviveAt = now() + 1500;
+    R.deaths = (R.deaths || 0) + 1;
     log('【重伤】被 ' + m.name + ' 击退，回营地恢复', 'c-bad');
-    setTimeout(function(){
-      S.hp = derived().hpMax; R.dead = false;
-      R.monHp = R.monHpMax; R.fightStart = now(); R.fightSkillUses = 0;
-      render(); save();
-    }, 1500);
+    if(R.deaths >= 3){
+      R.deaths = 0;
+      if(S.monIdx > 0) S.monIdx--;
+      else if(S.floorIdx > 0){ S.floorIdx--; S.monIdx = curFloor().monsters.length - 1; }
+      R.killGate = 0;
+      log('【回退】这一层打不动，回到上一层刷精华', 'c-bad');
+      setTimeout(function(){ R.monHp = curMon().hpMax; R.monHpMax = curMon().hpMax; }, 0);
+    }
     render(); dirty = false; lastRender = now();
     return;
   }
@@ -459,14 +667,13 @@ function castSkill(id){
     damageMonster(Math.round(D.atk*3.0), '碎骨');
     if(S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
   } else if(id === 'soul'){
-    S.ess += m.ess*3;
-    floatDmg('+' + (m.ess*3) + '精华', 'skill');
+    const g = Math.round(m.ess*3*D.essMul);
+    S.ess += g;
+    floatDmg('+' + g + '精华', 'skill');
   }
 
   let condLabel = '无条件';
-  for(let i=0;i<3;i++){
-    if(S.slots[i].skill === id) condLabel = CONDS[S.slots[i].cond].label;
-  }
+  for(let i=0;i<3;i++) if(S.slots[i].skill === id) condLabel = CONDS[S.slots[i].cond].label;
   log('【' + sk.name + '】' + condLabel, 'c-skill');
   markDirty();
 }
@@ -489,14 +696,18 @@ function checkSkills(){
   }
 }
 
-// ============================================================
-// 主循环
-// ============================================================
-let last = performance.now();
-function loop(t){
-  const dt = Math.min(150, t - last); last = t;
-
-  if(!R.dead && R.monHp > 0 && now() < R.poisonUntil){
+// ---------- 单步推进（真实循环与离线模拟共用） ----------
+function tick(dt){
+  if(R.dead){
+    if(now() >= R.reviveAt){
+      R.dead = false;
+      S.hp = derived().hpMax;
+      R.monHp = R.monHpMax; R.fightStart = now(); R.fightSkillUses = 0;
+      markDirty();
+    }
+    return;
+  }
+  if(R.monHp > 0 && now() < R.poisonUntil){
     R.poisonAcc += dt;
     if(R.poisonAcc >= 1000){
       R.poisonAcc = 0;
@@ -514,6 +725,12 @@ function loop(t){
     R.monTimer += dt;
     if(R.monTimer >= 1700){ R.monTimer = 0; monsterAttack(); }
   }
+}
+
+let last = performance.now();
+function loop(t){
+  const dt = Math.min(150, t - last); last = t;
+  tick(dt);
   if(dirty && t - lastRender >= 80){
     render(); dirty = false; lastRender = t;
   }
@@ -525,30 +742,34 @@ function loop(t){
 // ============================================================
 function render(){
   const D = derived();
+  if(S.hp > D.hpMax) S.hp = D.hpMax;
   const m = curMon();
-  const f = FLOORS[S.floorIdx];
+  const f = curFloor();
   const killed = S.kills[m.name] || 0;
   const hasSkill = S.skills.indexOf(m.skill) >= 0;
   const pct = Math.max(0, R.monHp / Math.max(1, R.monHpMax));
+  const ri = realmOf(S.lv);
 
-  document.getElementById('ess').textContent = S.ess;
-  document.getElementById('floorName').textContent = f.tier;
+  document.getElementById('realmName').textContent = REALMS[ri].name;
+  document.getElementById('lvNum').textContent = S.lv;
+  document.getElementById('ess').textContent = fmt(S.ess);
   document.getElementById('floorIdx').textContent = S.floorIdx + 1;
 
   document.getElementById('monEmoji').textContent = m.emoji;
   document.getElementById('monName').textContent = m.name;
   const st = document.getElementById('monStage');
-  st.textContent = hasSkill ? '已吞噬 · 技能已获得' : '已吞噬 ' + killed + ' / ' + KILLS_PER_TRAIT;
+  st.textContent = (hasSkill ? '已吞噬 · 技能已获得 · ' : '') +
+    '本层 ' + R.killGate + '/' + KILLS_PER_TRAIT + ' 只后推进';
   st.style.color = hasSkill ? '#a78bfa' : '#5a6b80';
 
   document.getElementById('monHpBar').style.width = (pct*100) + '%';
-  document.getElementById('monHpTxt').textContent = Math.max(0, Math.ceil(R.monHp)) + ' / ' + R.monHpMax;
+  document.getElementById('monHpTxt').textContent = fmt(Math.max(0,R.monHp)) + ' / ' + fmt(R.monHpMax);
 
   const mePct = Math.max(0, S.hp / D.hpMax);
   document.getElementById('meHpBar').style.width = (mePct*100) + '%';
   document.getElementById('meHpBar').style.background = mePct < 0.3
     ? 'linear-gradient(90deg,#a33,#e08080)' : 'linear-gradient(90deg,#3f8f5f,#7dd3a0)';
-  document.getElementById('meHpTxt').textContent = '你 ' + Math.ceil(S.hp) + ' / ' + D.hpMax;
+  document.getElementById('meHpTxt').textContent = '你 ' + fmt(S.hp) + ' / ' + fmt(D.hpMax);
 
   const sb = document.getElementById('shieldBar');
   if(R.shield > 0){
@@ -556,10 +777,20 @@ function render(){
     document.getElementById('shieldFill').style.width = Math.min(100, R.shield/D.hpMax*100) + '%';
   } else sb.style.display = 'none';
 
-  document.getElementById('sAtk').textContent = D.atk;
-  document.getElementById('sHp').textContent = Math.ceil(S.hp) + ' / ' + D.hpMax;
-  document.getElementById('sCrit').textContent = D.crit + '%';
+  // 修行
+  const need = expNeed(S.lv);
+  const ep = S.lv >= LV_MAX ? 1 : S.exp / need;
+  document.getElementById('expBar').style.width = Math.min(100, ep*100) + '%';
+  document.getElementById('expTxt').textContent = S.lv >= LV_MAX ? '已满级'
+    : fmt(S.exp) + ' / ' + fmt(need) + ' 经验';
+  document.getElementById('realmHint').textContent = S.lv >= LV_MAX ? '神级 · 满级'
+    : REALMS[ri].name + ' · 距下一境界 ' + (REALMS[Math.min(REALMS.length-1, ri+1)].from - S.lv) + ' 级';
+  document.getElementById('realmMul').textContent = '×' + D.realmMul.toFixed(2);
+  document.getElementById('atkMul').textContent = '×' + D.atkMul.toFixed(2);
+  document.getElementById('essMul').textContent = '×' + D.essMul.toFixed(2);
+  document.getElementById('riftMul').textContent = '×' + D.riftMul.toFixed(2);
 
+  // 战术槽
   const cnt = slotCount();
   document.getElementById('slotHint').textContent = cnt + ' / 3 槽位';
   const sl = document.getElementById('slotList');
@@ -567,47 +798,64 @@ function render(){
   if(slKey !== R.slKey){
     R.slKey = slKey;
     sl.innerHTML = S.slots.map(function(s, i){
-    if(i >= cnt){
-      return '<div class="slot locked"><div class="sicon">🔒</div>' +
-        '<div class="sinfo"><div class="sname none">未解锁</div>' +
-        '<div class="scond">吞噬 ' + SLOT_UNLOCK[i-1] + ' 个技能解锁</div></div></div>';
-    }
-    if(!s.skill){
-      return '<div class="slot empty" onclick="openPicker(' + i + ')"><div class="sicon">＋</div>' +
-        '<div class="sinfo"><div class="sname none">空槽位</div>' +
-        '<div class="scond">点击配置技能与触发条件</div></div><div class="sarrow">›</div></div>';
-    }
-    const sk = SKILLS[s.skill];
-    return '<div class="slot" onclick="openPicker(' + i + ')"><div class="sicon">' + sk.icon + '</div>' +
-      '<div class="sinfo"><div class="sname">' + sk.name + '</div>' +
+      if(i >= cnt){
+        return '<div class="slot locked"><div class="sicon">🔒</div>' +
+          '<div class="sinfo"><div class="sname none">未解锁</div>' +
+          '<div class="scond">吞噬 ' + SLOT_UNLOCK[i-1] + ' 个技能解锁</div></div></div>';
+      }
+      if(!s.skill){
+        return '<div class="slot empty" onclick="openPicker(' + i + ')"><div class="sicon">＋</div>' +
+          '<div class="sinfo"><div class="sname none">空槽位</div>' +
+          '<div class="scond">点击配置技能与触发条件</div></div><div class="sarrow">›</div></div>';
+      }
+      const sk = SKILLS[s.skill];
+      return '<div class="slot" onclick="openPicker(' + i + ')"><div class="sicon">' + sk.icon + '</div>' +
+        '<div class="sinfo"><div class="sname">' + sk.name + '</div>' +
         '<div class="scond">' + CONDS[s.cond].label + '</div></div><div class="sarrow">›</div></div>';
     }).join('');
   }
 
+  document.getElementById('sAtk').textContent = fmt(D.atk);
+  document.getElementById('sHp').textContent = fmt(S.hp) + ' / ' + fmt(D.hpMax);
+  document.getElementById('sCrit').textContent = D.crit + '%';
+  document.getElementById('sEps').textContent = S.eps < 10000 ? S.eps.toFixed(1) : fmt(S.eps);
+
   const costs = {
-    atk: Math.round(12*Math.pow(1.24, S.upAtkLv)),
-    hp:  Math.round(12*Math.pow(1.24, S.upHpLv)),
-    crit:Math.round(30*Math.pow(1.60, S.upCritLv)),
-    speed:Math.round(40*Math.pow(1.45, S.spdLv)),
+    atk: Math.round(12*Math.pow(CFG.upCostGrow, S.upAtkLv)),
+    hp:  Math.round(12*Math.pow(CFG.upCostGrow, S.upHpLv)),
+    crit:Math.round(30*Math.pow(1.55, S.upCritLv)),
+    speed:Math.round(40*Math.pow(1.40, S.spdLv)),
   };
   setBtn('uAtk', costs.atk, 'cAtk');
   setBtn('uHp', costs.hp, 'cHp');
-  setBtn('uCrit', costs.crit, 'cCrit');
-  setBtn('uSpeed', costs.speed, 'cSpeed');
+  setBtn('uCrit', costs.crit, 'cCrit', S.crit >= CFG.critMax ? '已满' : null);
+  setBtn('uSpeed', costs.speed, 'cSpeed', S.spdLv >= CFG.spdMax ? '已满' : null);
 
-  document.getElementById('autoTxt').textContent = R.dead ? '恢复中…' : '自动战斗中';
+  document.getElementById('autoTxt').textContent = R.dead ? '恢复中…'
+    : (S.autoAdv ? '自动战斗中 · 自动推进已开' : '自动战斗中 · 手动推进');
+  const ba = document.getElementById('btnAuto');
+  ba.textContent = '自动推进：' + (S.autoAdv ? '开' : '关');
+  ba.classList.toggle('on', !!S.autoAdv);
 }
 
-function setBtn(id, cost, costId){
+function setBtn(id, cost, costId, maxedLabel){
   const btn = document.getElementById(id);
+  if(!btn) return;
+  if(maxedLabel){
+    btn.disabled = true; btn.classList.remove('can');
+    const el = document.getElementById(costId);
+    if(el) el.textContent = maxedLabel;
+    return;
+  }
   const can = S.ess >= cost;
   btn.disabled = !can;
   btn.classList.toggle('can', can);
-  document.getElementById(costId).textContent = cost + ' 精华';
+  const c = document.getElementById(costId);
+  if(c) c.textContent = fmt(cost) + ' 精华';
 }
 
 // ============================================================
-// 槽位配置面板
+// 槽位配置
 // ============================================================
 window.openPicker = function(slotIdx){
   const slot = S.slots[slotIdx];
@@ -652,53 +900,75 @@ window.setSlotSkill = function(i, id){
 window.setSlotCond = function(i, cond){ S.slots[i].cond = cond; render(); save(); };
 window.clearSlot = function(i){ S.slots[i].skill = null; render(); save(); };
 window.closePicker = function(){ document.getElementById('overlay').classList.remove('on'); };
+window.closeOffline = function(){ document.getElementById('offlineBox').classList.remove('on'); };
 
 // ============================================================
 // 交互
 // ============================================================
-document.getElementById('uAtk').onclick = function(){
-  const c = Math.round(12*Math.pow(1.24, S.upAtkLv));
-  if(S.ess < c) return;
-  S.ess -= c; S.upAtkLv++; S.atk += 2; render(); save();
-};
-document.getElementById('uHp').onclick = function(){
-  const c = Math.round(12*Math.pow(1.24, S.upHpLv));
-  if(S.ess < c) return;
-  S.ess -= c; S.upHpLv++; S.hpMax += 10; S.hp += 10; render(); save();
-};
-document.getElementById('uCrit').onclick = function(){
-  const c = Math.round(30*Math.pow(1.60, S.upCritLv));
-  if(S.ess < c) return;
-  S.ess -= c; S.upCritLv++; S.crit += 1; render(); save();
-};
-document.getElementById('uSpeed').onclick = function(){
-  const c = Math.round(40*Math.pow(1.45, S.spdLv));
-  if(S.ess < c) return;
-  S.ess -= c; S.spdLv++; render(); save();
-};
+function buyAtk(){
+  const c = Math.round(12*Math.pow(CFG.upCostGrow, S.upAtkLv));
+  if(S.ess < c) return false;
+  S.ess -= c; S.upAtkLv++;
+  S.atk += Math.round(2*Math.pow(CFG.upPowGrow, S.upAtkLv));
+  return true;
+}
+function buyHp(){
+  const c = Math.round(12*Math.pow(CFG.upCostGrow, S.upHpLv));
+  if(S.ess < c) return false;
+  S.ess -= c; S.upHpLv++;
+  S.hpMax += Math.round(10*Math.pow(CFG.upPowGrow, S.upHpLv));
+  S.hp = derived().hpMax;        // 买血回满
+  return true;
+}
+function buySpeed(){
+  if(S.spdLv >= CFG.spdMax) return false;
+  const c = Math.round(40*Math.pow(1.40, S.spdLv));
+  if(S.ess < c) return false;
+  S.ess -= c; S.spdLv++; return true;
+}
+function buyCrit(){
+  if(S.crit >= CFG.critMax) return false;
+  const c = Math.round(30*Math.pow(1.55, S.upCritLv));
+  if(S.ess < c) return false;
+  S.ess -= c; S.upCritLv++; S.crit += 1; return true;
+}
 
-document.getElementById('btnNext').onclick = function(){
-  const f = FLOORS[S.floorIdx];
-  if(S.monIdx < f.monsters.length - 1){
-    S.monIdx++;
-  } else if(S.floorIdx < FLOORS.length - 1){
-    S.floorIdx++; S.monIdx = 0;
-    log('【进入】' + FLOORS[S.floorIdx].name + '（' + FLOORS[S.floorIdx].tier + ' 级）', 'c-epic');
-  } else { log('已到达当前版本最深处。'); return; }
-  startFight(); save();
-};
+document.getElementById('uAtk').onclick = function(){ if(buyAtk()){ render(); save(); } };
+document.getElementById('uHp').onclick = function(){ if(buyHp()){ render(); save(); } };
+document.getElementById('uCrit').onclick = function(){ if(buyCrit()){ render(); save(); } };
+document.getElementById('uSpeed').onclick = function(){ if(buySpeed()){ render(); save(); } };
 
-document.getElementById('btnReset').onclick = function(){
-  if(!confirm('确认重置全部进度？此操作不可撤销。')) return;
-  localStorage.removeItem(SAVE_KEY);
-  S = freshState(); R.cds = {};
-  startFight(); save();
-  log('进度已重置。');
+document.getElementById('btnNext').onclick = function(){ advance(false); };
+document.getElementById('btnAuto').onclick = function(){
+  S.autoAdv = !S.autoAdv;
+  R.killGate = 0;
+  render(); save();
 };
 
 document.getElementById('overlay').onclick = function(e){
   if(e.target.id === 'overlay') closePicker();
 };
+
+// ============================================================
+// 离线收益
+// ============================================================
+function settleOffline(){
+  if(!S.lastSeen) return;
+  const sec = Math.min(OFF_CAP_SEC, Math.max(0, (Date.now() - S.lastSeen)/1000));
+  if(sec < 60) return;                     // 少于 1 分钟不结算
+  const ess = Math.round(S.eps * sec * OFF_RATE);
+  const exp = Math.round(S.eps * sec * OFF_RATE * CFG.expRatio);
+  if(ess <= 0) return;
+  S.ess += ess; S.totalEss += ess;
+  gainExp(exp);
+  S.offSum = {sec:Math.round(sec), ess:ess, exp:exp};
+
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  document.getElementById('offTime').textContent = (h>0 ? h+' 小时 ' : '') + m + ' 分';
+  document.getElementById('offEss').textContent = '+' + fmt(ess) + ' 精华';
+  document.getElementById('offExp').textContent = '+' + fmt(exp) + ' 经验';
+  document.getElementById('offlineBox').classList.add('on');
+}
 
 // ============================================================
 // 启动
@@ -708,14 +978,58 @@ function boot(){
   startFight();
   if(had){
     log('【系统】读取存档，继续自动战斗。');
+    if(S.offSum){
+      log('【离线】上次离线 ' + S.offSum.sec + ' 秒，补发了 ' + S.offSum.ess + ' 精华', 'c-epic');
+      S.offSum = null;
+    }
+    settleOffline();
   } else {
     log('【系统】裂隙降临。战斗已全自动。');
-    log('吞噬同类 10 只 → 习得技能 → 到「战术」里配触发条件。');
+    log('击杀给经验，经验升境界；同类杀 10 只吞噬技能。');
   }
   render();
   requestAnimationFrame(loop);
+  setInterval(function(){ save(); }, 10000);
 }
 boot();
+
+// ============================================================
+// 测试用快进（无渲染、无动画，纯逻辑）
+// ============================================================
+window.__sim = function(seconds, autoBuy){
+  const prevSilent = SILENT; SILENT = true;
+  const step = 50, n = Math.round(seconds*1000/step);
+  const startFloor = S.floorIdx;
+  for(let i=0;i<n;i++){
+    CLOCK += step;
+    tick(step);
+    if(autoBuy && i % 20 === 0){
+      for(let guard=0; guard<80; guard++){
+        const fns = [buyAtk, buyHp, buySpeed, buyCrit];
+        const costs = [
+          Math.round(12*Math.pow(CFG.upCostGrow,S.upAtkLv)),
+          Math.round(12*Math.pow(CFG.upCostGrow,S.upHpLv)),
+          Math.round(40*Math.pow(1.40,S.spdLv)),
+          Math.round(30*Math.pow(1.55,S.upCritLv)),
+        ];
+        const capped = [false,false, S.spdLv>=CFG.spdMax, S.crit>=CFG.critMax];
+        let idx = -1;
+        for(let j=0;j<costs.length;j++){
+          if(capped[j]) continue;
+          if(idx < 0 || costs[j] < costs[idx]) idx = j;
+        }
+        if(idx < 0) break;
+        if(S.ess < costs[idx]) break;
+        fns[idx]();
+      }
+    }
+  }
+  SILENT = prevSilent;
+  return {floor:S.floorIdx+1, lv:S.lv, realm:REALMS[realmOf(S.lv)].name,
+    ess:S.ess, atk:derived().atk, hp:derived().hpMax,
+    kills:Object.values(S.kills).reduce(function(a,b){return a+b;},0),
+    skills:S.skills.length, monHp:Math.ceil(R.monHp), eps:+S.eps.toFixed(2)};
+};
 </script>
 </body>
 </html>
