@@ -185,6 +185,7 @@ body{
     <div class="row"><span class="k">攻击倍率</span><span class="v" id="atkMul">×1.00</span></div>
     <div class="row"><span class="k">精华倍率</span><span class="v" id="essMul">×1.00</span></div>
     <div class="row"><span class="k">裂隙共鸣</span><span class="v" id="riftMul">×1.00</span></div>
+    <div class="row"><span class="k">本层收益</span><span class="v" id="farmMul">×1.00</span></div>
   </div>
 
   <div class="panel">
@@ -324,7 +325,7 @@ function expNeed(lv){ return Math.round(20 * Math.pow(CFG.expGrow, lv-1)); }
 // 数值配置（调平衡只改这里）
 // ============================================================
 const CFG = {
-  hpGrow:     1.16,   // 每深入 1 层，怪血量倍率（模拟调优值）
+  hpGrow:     1.18,   // 每深入 1 层，怪血量倍率（模拟调优值）
   monAtkGrow: 1.09,   // 每深入 1 层，怪攻击倍率（必须远低于 hpGrow，否则变死亡循环）
   essGrow:    1.11,   // 每深入 1 层，精华倍率（必须低于 hpGrow，否则滚雪球）
   upCostGrow: 1.22,   // 升级花费倍率
@@ -332,6 +333,8 @@ const CFG = {
   expGrow:    1.28,   // 每级所需经验成长
   expRatio:   0.5,    // 经验 = 精华 × 系数
   riftGrow:   1.08,   // 裂隙共鸣：每深入一层，永久全属性倍率（必须低于 hpGrow）
+  farmDecay:  0.08,   // 低于最深纪录每层，收益衰减 8%
+  farmMin:    0.20,   // 收益衰减下限
   spdMax:     24,     // 攻速升级上限（0.92^24 ≈ 0.135）
   critMax:    75,     // 暴击率上限
   minInterval:160,    // 攻击间隔下限（毫秒），防止无限连击
@@ -392,13 +395,11 @@ function curMon(){
   const mult = e.mult || 1;
   const atkMult = e.atkMult || mult;
   const essMult = e.essMult || mult;
-  // 同名怪击杀越多，重生时略强（10%），避免无限刷同一只
-  const k = S.kills[t.name] || 0;
-  const rep = 1 + Math.max(0, Math.floor(k / KILLS_PER_TRAIT) - 1) * 0.10;
+  // 同层怪不再随击杀变强：难度只由层数决定
   return {name:t.name, emoji:t.emoji, skill:t.skill,
-    hpMax: Math.round(t.hp * mult * rep),
-    atk: Math.round(t.atk * atkMult * rep),
-    ess: Math.round(t.ess * essMult * Math.max(1, rep))};
+    hpMax: Math.round(t.hp * mult),
+    atk: Math.round(t.atk * atkMult),
+    ess: Math.round(t.ess * essMult)};
 }
 
 // ---------- 派生 ----------
@@ -538,8 +539,10 @@ function killMonster(){
   const m = curMon();
   const D = derived();
   const dur = ((now() - R.fightStart)/1000).toFixed(1);
-  const essGain = Math.round(m.ess * D.essMul);
-  const expGain = Math.max(1, Math.round(m.ess * CFG.expRatio));
+  const deepGap = Math.max(0, S.bestFloor - S.floorIdx);   // 比最深纪录低几层
+  const farmMul = Math.max(CFG.farmMin, 1 - CFG.farmDecay*deepGap);
+  const essGain = Math.round(m.ess * D.essMul * farmMul);
+  const expGain = Math.max(1, Math.round(m.ess * CFG.expRatio * farmMul));
 
   S.ess += essGain; S.totalEss += essGain;
   S.kills[m.name] = (S.kills[m.name] || 0) + 1;
@@ -554,7 +557,8 @@ function killMonster(){
   const lf = document.getElementById('sLast');
   if(lf) lf.textContent = dur + 's · ' + R.fightSkillUses + ' 技能';
 
-  log('击杀 ' + m.name + '｜' + dur + 's｜+' + fmt(essGain) + ' 精华｜+' + fmt(expGain) + ' 经验', 'c-good');
+  log('击杀 ' + m.name + '｜' + dur + 's｜+' + fmt(essGain) + ' 精华｜+' + fmt(expGain) + ' 经验' +
+      (deepGap > 0 ? '（低层衰减 ×' + farmMul.toFixed(2) + '）' : ''), 'c-good');
 
   // 吞噬技能
   if(k === KILLS_PER_TRAIT && S.skills.indexOf(m.skill) < 0){
@@ -789,6 +793,11 @@ function render(){
   document.getElementById('atkMul').textContent = '×' + D.atkMul.toFixed(2);
   document.getElementById('essMul').textContent = '×' + D.essMul.toFixed(2);
   document.getElementById('riftMul').textContent = '×' + D.riftMul.toFixed(2);
+  const gap = Math.max(0, S.bestFloor - S.floorIdx);
+  const fm = Math.max(CFG.farmMin, 1 - CFG.farmDecay*gap);
+  const fmEl = document.getElementById('farmMul');
+  fmEl.textContent = '×' + fm.toFixed(2) + (gap > 0 ? '（低 ' + gap + ' 层）' : '');
+  fmEl.style.color = gap > 0 ? '#e0a080' : '#e6edf7';
 
   // 战术槽
   const cnt = slotCount();
