@@ -226,6 +226,11 @@ body{
   </div>
 
   <div class="panel">
+    <h3>本场输出 <span class="hint" id="dpsHint"></span></h3>
+    <div id="dmgBreak" style="font-size:11.5px;color:#8a9bb0"></div>
+  </div>
+
+  <div class="panel">
     <h3>战斗记录</h3>
     <div class="log" id="log"></div>
   </div>
@@ -304,16 +309,16 @@ function floorDef(f){            // f 从 0 开始
 // 技能表
 // ============================================================
 const SKILLS = {
-  bite:        {name:'噬咬', icon:'🦷', cd:5000,  desc:'320% 攻击力（初始技能）'},
-  harden:      {name:'硬化', icon:'🛡', cd:7000,  desc:'获得最大生命 22% 的护盾'},
-  bloodthirst: {name:'嗜血', icon:'🩸', cd:6000,  desc:'立即回复 12% 生命'},
-  haste:       {name:'疾风', icon:'⚡', cd:13000, desc:'6 秒内攻速 ×2'},
-  rend:        {name:'裂爪', icon:'🗡', cd:5000,  desc:'520% 攻击力重击；消耗 1 层毒转 2 层裂伤'},
-  venom:       {name:'淬毒', icon:'☠', cd:7000,  desc:'260% 攻击力 + 5 层毒'},
-  ironwall:    {name:'铁壁', icon:'🪨', cd:14000, desc:'6 秒内受到伤害 -50%'},
-  triple:      {name:'连斩', icon:'✨', cd:6000,  desc:'连续 3 次 150% 攻击力攻击'},
-  crush:       {name:'碎骨', icon:'💥', cd:9000, desc:'680% 攻击力 + 引爆全部裂伤（每层 +35%）'},
-  soul:        {name:'噬魂', icon:'🌀', cd:16000, desc:'获得 3.5 倍怪物精华（毒层每层再 +15%）'},
+  bite:        {name:'噬咬', icon:'🦷', cd:4000,  desc:'320% 攻击力（初始技能）'},
+  harden:      {name:'硬化', icon:'🛡', cd:6000,  desc:'获得最大生命 22% 的护盾'},
+  bloodthirst: {name:'嗜血', icon:'🩸', cd:5000,  desc:'立即回复 12% 生命'},
+  haste:       {name:'疾风', icon:'⚡', cd:9000,  desc:'6 秒内攻速 ×2'},
+  rend:        {name:'裂爪', icon:'🗡', cd:3500,  desc:'520% 攻击力重击；消耗 1 层毒转 2 层裂伤'},
+  venom:       {name:'淬毒', icon:'☠', cd:5000,  desc:'260% 攻击力 + 5 层毒'},
+  ironwall:    {name:'铁壁', icon:'🪨', cd:10000, desc:'6 秒内受到伤害 -50%'},
+  triple:      {name:'连斩', icon:'✨', cd:4500,  desc:'连续 3 次 150% 攻击力攻击'},
+  crush:       {name:'碎骨', icon:'💥', cd:6500,  desc:'680% 攻击力 + 引爆全部裂伤（每层 +35%）'},
+  soul:        {name:'噬魂', icon:'🌀', cd:12000, desc:'获得 3.5 倍怪物精华（毒层每层再 +15%）'},
 };
 
 const CONDS = {
@@ -353,8 +358,8 @@ const CFG = {
   essGrow:    1.07,   // 每深入 1 层，精华倍率
   upCostGrow: 1.22,   // 升级花费倍率
   upPowGrow:  1.0,    // 升级效果倍率（1.0 = 固定加成，取消几何膨胀）
-  hpScale:    4.0,    // 怪物血量整体倍率（拉长战斗时长）
-  essScale:   2.6,    // 精华整体倍率（补偿变慢的击杀节奏）
+  hpScale:    13.0,   // 怪物血量整体倍率（拉到 15-20 秒一场）
+  essScale:   7.0,    // 精华整体倍率（补偿变慢的击杀节奏）
   expGrow:    1.28,   // 每级所需经验成长
   expRatio:   0.5,    // 经验 = 精华 × 系数
   riftGrow:   1.06,   // 裂隙共鸣：每深入一层，永久全属性倍率（略高于 monAtkGrow）
@@ -364,10 +369,8 @@ const CFG = {
   critMax:    75,     // 暴击率上限
   minInterval:160,    // 攻击间隔下限（毫秒），防止无限连击
   advSecLimit:45,     // 单场超过这么多秒就原地刷，不再自动深入
-  advFastSec:  12,    // 单场快于这个秒数，算"打得动"
-  advFastNeed: 3,     // 连续几只打得动就自动上一层
-  forceAdvAfter: 6,   // 连续这么多只都慢，也硬推一层（探测），防止永久卡死
-  retreatSec:  50,    // 单只打超过这么久还没打死，回退一层
+  killsPerFloor: 3,   // 每只怪杀满这么多只就往后推进（杀得快 = 层数涨得快）
+  retreatSec:  45,    // 单只打超过这么久还没打死，回退一层
   floorCap:   999,
 };
 
@@ -375,11 +378,11 @@ const CFG = {
 // 敌人词缀：只改行为，不改数值
 // ============================================================
 const AFFIXES = {
-  thorns:  {name:'反伤', icon:'🛡', desc:'被打中时反弹伤害（上限为你最大生命的 5%）'},
-  regen:   {name:'再生', icon:'♻️', desc:'每 4 秒回复自身 6% 生命'},
-  enrage:  {name:'狂暴', icon:'⚡', desc:'自身生命低于 35% 时攻击力 ×2'},
-  immune:  {name:'免疫', icon:'🧊', desc:'开战后 3 秒内免疫伤害'},
-  leech:   {name:'吸血', icon:'🩸', desc:'每次攻击回复自身 4% 生命'},
+  thorns:  {name:'反伤', icon:'🛡', desc:'被打中时反弹 30% 伤害（上限为你最大生命的 14%）'},
+  regen:   {name:'再生', icon:'♻️', desc:'每 3 秒回复自身 14% 生命'},
+  enrage:  {name:'狂暴', icon:'⚡', desc:'自身生命低于 35% 时攻击力 ×2.6'},
+  immune:  {name:'免疫', icon:'🧊', desc:'开战后 4 秒内免疫伤害'},
+  leech:   {name:'吸血', icon:'🩸', desc:'每次攻击回复自身 7% 生命'},
   burn:    {name:'灼烧', icon:'🔥', desc:'攻击附加 3 秒灼烧'},
 };
 const AFFIX_ORDER = ['thorns','regen','enrage','immune','leech','burn'];
@@ -522,7 +525,7 @@ const R = {
   monTimer:0, atkTimer:0, atkCount:0,
   shield:0,
   hasteUntil:0, armorUntil:0, poisonAcc:0,
-  poisonStack:0, lacStack:0,
+  poisonStack:0, lacStack:0, dmgBy:{}, fightStartSnap:0,
   cds:{},
   fightStart:0, fightSkillUses:0,
   fightId:0, slKey:'', reviveAt:0, fastKills:0, slowKills:0,
@@ -655,8 +658,10 @@ function startFight(){
   R.shield = 0;
   R.regenTimer = 0; R.meBurnUntil = 0; R.meBurnAcc = 0;
   R.poisonStack = 0; R.lacStack = 0; R.poisonAcc = 0;
+  R.dmgBy = {};
   R.rushUntil = 0; R.armorStrong = false; R.reflectNext = false;
   R.fightStart = now(); R.fightSkillUses = 0;
+  R.dmgBy = {};
   R.fightId++;
   render();
   dirty = false; lastRender = now();
@@ -668,9 +673,11 @@ function hasAffix(k){
 }
 
 function damageMonster(dmg, tag){
+  const key = tag || '普攻';
+  R.dmgBy[key] = (R.dmgBy[key] || 0) + dmg;
   const m = curMon();
   // 免疫：开战 3 秒内打不动
-  if((m.affixes||[]).indexOf('immune') >= 0 && now() - R.fightStart < 3000){
+  if((m.affixes||[]).indexOf('immune') >= 0 && now() - R.fightStart < 4000){
     floatDmg('免疫', 'skill');
     markDirty();
     return false;
@@ -678,7 +685,7 @@ function damageMonster(dmg, tag){
   // 反伤：按伤害比例反弹，但设上限，避免高伤害自杀
   if((m.affixes||[]).indexOf('thorns') >= 0 && dmg > 0){
     const D2 = derived();
-    const back = Math.min(Math.round(dmg*0.18), Math.round(D2.hpMax*0.05));
+    const back = Math.min(Math.round(dmg*0.30), Math.round(D2.hpMax*0.14));
     if(back > 0 && !R.dead){
       S.hp -= back;
       floatDmg('反 ' + fmt(back), 'crit');
@@ -755,27 +762,11 @@ function killMonster(){
     }
   }
 
-  // 自动推进：看「击杀速度」，不看「击杀数量」
+  // 自动推进：本层杀满 N 只就上一层。杀得快 = 爬得快，战术强度直接变成进度
   R.killGate++;
-  const fast = parseFloat(dur) <= CFG.advFastSec;
-  if(fast){ R.fastKills = (R.fastKills || 0) + 1; R.slowKills = 0; }
-  else { R.fastKills = 0; R.slowKills = (R.slowKills || 0) + 1; }
-
-  if(S.autoAdv && R.fastKills >= CFG.advFastNeed && R.killGate >= KILLS_PER_TRAIT){
-    R.fastKills = 0;
+  if(S.autoAdv && R.killGate >= CFG.killsPerFloor){
     advance(true);
     return;
-  }
-  // 探测式推进：慢杀累积到阈值也硬上一层的，避免永久卡死在同一层
-  if(S.autoAdv && !fast && R.slowKills >= CFG.forceAdvAfter){
-    R.slowKills = 0;
-    log('【探测】这一层杀不动了，向上试一层', 'c-skill');
-    advance(true);
-    return;
-  }
-  if(!fast && R.killGate >= 3 && !R.slowNoticed){
-    R.slowNoticed = true;
-    log('【停滞】这一层杀得慢，先原地刷精华（攒够了会自己往上试）', 'c-bad');
   }
   startFight(); save();
 }
@@ -868,18 +859,18 @@ function monsterAttack(){
   const aff = m.affixes || [];
   let raw = m.atk;
   // 狂暴：自身残血时攻击翻倍
-  if(aff.indexOf('enrage') >= 0 && R.monHp / Math.max(1,R.monHpMax) < 0.35) raw *= 2;
+  if(aff.indexOf('enrage') >= 0 && R.monHp / Math.max(1,R.monHpMax) < 0.35) raw *= 2.6;
   const armorOn = now() < R.armorUntil;
   let dmg = raw * (armorOn ? (R.armorStrong ? 0.3 : 0.5) : 1);
   dmg = Math.max(1, Math.round(dmg));
   // 吸血：攻击后回复自身生命
   if(aff.indexOf('leech') >= 0 && R.monHp > 0){
-    R.monHp = Math.min(R.monHpMax, R.monHp + Math.round(R.monHpMax*0.04));
+    R.monHp = Math.min(R.monHpMax, R.monHp + Math.round(R.monHpMax*0.07));
   }
   // 灼烧：给对方挂持续伤害
   if(aff.indexOf('burn') >= 0){
     R.meBurnUntil = now() + 3000;
-    R.meBurnDps = Math.max(1, Math.round(m.atk*0.25));
+    R.meBurnDps = Math.max(1, Math.round(m.atk*0.45));
   }
 
   if(R.shield > 0){
@@ -1086,9 +1077,9 @@ function tick(dt){
   const affNow = (curMon().affixes || []);
   if(R.monHp > 0 && R.monHp < R.monHpMax && affNow.indexOf('regen') >= 0){
     R.regenTimer += dt;
-    if(R.regenTimer >= 4000){
+    if(R.regenTimer >= 3000){
       R.regenTimer = 0;
-      R.monHp = Math.min(R.monHpMax, R.monHp + Math.round(R.monHpMax*0.06));
+      R.monHp = Math.min(R.monHpMax, R.monHp + Math.round(R.monHpMax*0.14));
       floatDmg('再生', 'skill');
       markDirty();
     }
@@ -1165,7 +1156,8 @@ function render(){
   document.getElementById('monName').textContent = m.name;
   const st = document.getElementById('monStage');
   st.textContent = (hasSkill ? '已吞噬 · ' : '') +
-    '连杀 ' + (R.fastKills||0) + '/' + CFG.advFastNeed + ' 只（' + CFG.advFastSec + ' 秒内）自动深入';
+    '本层 ' + R.killGate + '/' + CFG.killsPerFloor + ' 只后深入 · 上一战 ' +
+    (S.lastFight ? S.lastFight.t + 's' : '—');
   st.style.color = hasSkill ? '#a78bfa' : '#5a6b80';
 
   // 词缀标签
@@ -1334,6 +1326,22 @@ function render(){
           '<div class="scond" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' + chips + '</div></div></div>';
       }).join('');
     }
+  }
+
+  // 本场输出构成
+  const db = document.getElementById('dmgBreak');
+  const entries = Object.keys(R.dmgBy).map(function(k){ return [k, R.dmgBy[k]]; })
+    .sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+  const total = entries.reduce(function(a,b){ return a+b[1]; }, 0) || 1;
+  db.innerHTML = entries.length ? entries.map(function(e){
+    const pct = Math.round(e[1]/total*100);
+    return '<div style="display:flex;justify-content:space-between;padding:3px 0">' +
+      '<span>' + e[0] + '</span><span style="color:#c8d3e0">' + pct + '% · ' + fmt(e[1]) + '</span></div>';
+  }).join('') : '<div style="color:#4a5a6d">（本场还没有伤害）</div>';
+  const dh = document.getElementById('dpsHint');
+  if(dh){
+    const sec = Math.max(0.5, (now()-R.fightStart)/1000);
+    dh.textContent = 'DPS ' + fmt(total/sec) + ' · 已打 ' + sec.toFixed(1) + 's';
   }
 
   document.getElementById('sAtk').textContent = fmt(D.atk);
