@@ -284,10 +284,17 @@ function floorDef(f){            // f 从 0 开始
   const grade = ['F','E','D','C','B','A','S','SS','SSS'][Math.min(8, Math.floor(depth/8))];
   // 词缀：第 4 层起每层 1 个，第 10 层起 2 个（轮换，保证每层有辨识度）
   const aff = pickAffixes(f);
+  // 以第 3 层末尾（虚空之眼 470/26/28）为基准，按深度连续放大
+  const BASE = {hp:470, atk:26, ess:28};
   const mons = [];
   for(let i=0;i<3;i++){
     const tpl = TEMPLATES[(f*3 + i) % 9];
-    mons.push({tpl:tpl, mult:hpMul, atkMult:atkMul, essMult:essMul, affixes:aff});
+    mons.push({
+      tpl: tpl,
+      base: {hp:BASE.hp*hpMul, atk:BASE.atk*atkMul, ess:BASE.ess*essMul},
+      mult:1, atkMult:1, essMult:1,
+      affixes: aff,
+    });
   }
   return {tier:grade, name:'裂隙 · 第'+lvl+'层', monsters:mons, affixes:aff};
 }
@@ -296,6 +303,7 @@ function floorDef(f){            // f 从 0 开始
 // 技能表
 // ============================================================
 const SKILLS = {
+  bite:        {name:'噬咬', icon:'🦷', cd:5000,  desc:'320% 攻击力（初始技能）'},
   harden:      {name:'硬化', icon:'🛡', cd:7000,  desc:'获得最大生命 22% 的护盾'},
   bloodthirst: {name:'嗜血', icon:'🩸', cd:6000,  desc:'立即回复 12% 生命'},
   haste:       {name:'疾风', icon:'⚡', cd:13000, desc:'6 秒内攻速 ×2'},
@@ -473,7 +481,7 @@ function gemSlots(){
 }
 function gemUnlocked(G){ return S.lv >= (GEM_TIER_UNLOCK[G.tier] || 1); }
 
-const KILLS_PER_TRAIT = 10;
+const KILLS_PER_TRAIT = 3;      // 同类击杀 3 只即可吞噬（推进按速度，10 只凑不齐）
 const SLOT_UNLOCK = [4, 7];
 const SAVE_KEY = 'devour_idle_v3';
 const OFF_CAP_SEC = 8*3600;
@@ -487,9 +495,9 @@ function freshState(){
     ess:0, totalEss:0,
     lv:1, exp:0,
     floorIdx:0, monIdx:0,
-    kills:{}, skills:[],
-    slots:[{skill:null,cond:'always'},{skill:null,cond:'always'},{skill:null,cond:'always'}],
-    gems:{},                                  // 技能 → [词条id, 词条id]
+    kills:{}, skills:['bite'],                 // 初始技能：噬咬
+    slots:[{skill:'bite',cond:'always'},{skill:null,cond:'always'},{skill:null,cond:'always'}],
+    gems:{bite:['edge1']},                    // 初始送一个初级词条：锋利
     atk:5, hpMax:50, hp:50, crit:5, spdLv:0,
     upAtkLv:0, upHpLv:0, upCritLv:0,
     autoAdv:true, bestFloor:0,
@@ -534,14 +542,15 @@ function curMon(){
   const essMult = e.essMult || mult;
   // 同层怪不再随击杀变强：难度只由层数决定
   const ev = (S.evFloor === S.floorIdx && S.evMod) ? S.evMod : {};
+  const b = e.base || {hp:t.hp*mult, atk:t.atk*(e.atkMult||mult), ess:t.ess*(e.essMult||mult)};
   const evHp = ev.hp || 1, evAtk = ev.atk || 1, evEss = ev.ess || 1;
   let aff = R.forceAffixes || e.affixes || [];
   if(ev.noAffix || R.affixSuppress) aff = [];
   return {name:t.name, emoji:t.emoji, skill:t.skill,
     affixes: aff,
-    hpMax: Math.round(t.hp * mult * evHp),
-    atk: Math.round(t.atk * atkMult * evAtk),
-    ess: Math.round(t.ess * essMult * evEss)};
+    hpMax: Math.round(b.hp * evHp),
+    atk: Math.round(b.atk * evAtk),
+    ess: Math.round(b.ess * evEss)};
 }
 
 // ---------- 派生 ----------
@@ -746,7 +755,7 @@ function killMonster(){
   if(fast) R.fastKills = (R.fastKills || 0) + 1;
   else R.fastKills = 0;
 
-  if(S.autoAdv && R.fastKills >= CFG.advFastNeed){
+  if(S.autoAdv && R.fastKills >= CFG.advFastNeed && R.killGate >= KILLS_PER_TRAIT){
     R.fastKills = 0;
     advance(true);
     return;
@@ -944,7 +953,9 @@ function castSkill(id){
   R.cds[id] = now() + sk.cd * cdCut * gm.cd;
   R.fightSkillUses++;
 
-  if(id === 'harden'){
+  if(id === 'bite'){
+    hit(D.atk*3.2, '噬咬', gm);
+  } else if(id === 'harden'){
     R.shield += Math.round(D.hpMax*0.22);
   } else if(id === 'bloodthirst'){
     let heal = Math.round(D.hpMax*0.12);
@@ -1355,7 +1366,7 @@ window.openPicker = function(slotIdx){
   let html = '<h4>槽位 ' + (slotIdx+1) + ' · 技能</h4>';
   if(owned.length === 0){
     html += '<div class="opt lock"><div class="ot">还没有吞噬任何技能' +
-      '<div class="od">把同类怪物击杀 10 只即可吞噬</div></div></div>';
+      '<div class="od">把同类怪物击杀 3 只即可吞噬</div></div></div>';
   } else {
     owned.forEach(function(id){
       const sk = SKILLS[id];
@@ -1514,8 +1525,9 @@ function boot(){
     }
     settleOffline();
   } else {
-    log('【系统】裂隙降临。战斗已全自动。');
-    log('击杀给经验，经验升境界；同类杀 10 只吞噬技能。');
+    log('【系统】裂隙降临。战斗已全自动。', 'c-epic');
+    log('开局送你技能「噬咬」+ 词条「锋利」，已配在战术槽 1，它会自己放。');
+    log('点「战术」换触发条件；点「词条」给技能加改造；同类怪杀 3 只可吞噬新技能。');
   }
   render();
   requestAnimationFrame(loop);
