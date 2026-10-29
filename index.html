@@ -348,22 +348,26 @@ function expNeed(lv){ return Math.round(20 * Math.pow(CFG.expGrow, lv-1)); }
 // 数值配置（调平衡只改这里）
 // ============================================================
 const CFG = {
-  hpGrow:     1.18,   // 每深入 1 层，怪血量倍率（模拟调优值）
-  monAtkGrow: 1.09,   // 每深入 1 层，怪攻击倍率（必须远低于 hpGrow，否则变死亡循环）
-  essGrow:    1.11,   // 每深入 1 层，精华倍率（必须低于 hpGrow，否则滚雪球）
+  hpGrow:     1.09,   // 每深入 1 层，怪血量倍率（和玩家成长对齐，避免秒杀）
+  monAtkGrow: 1.055,  // 每深入 1 层，怪攻击倍率
+  essGrow:    1.07,   // 每深入 1 层，精华倍率
   upCostGrow: 1.22,   // 升级花费倍率
-  upPowGrow:  1.03,   // 升级效果倍率（几何成长，防数值墙）
+  upPowGrow:  1.0,    // 升级效果倍率（1.0 = 固定加成，取消几何膨胀）
+  hpScale:    4.0,    // 怪物血量整体倍率（拉长战斗时长）
+  essScale:   2.6,    // 精华整体倍率（补偿变慢的击杀节奏）
   expGrow:    1.28,   // 每级所需经验成长
   expRatio:   0.5,    // 经验 = 精华 × 系数
-  riftGrow:   1.105,  // 裂隙共鸣：每深入一层，永久全属性倍率（≥monAtkGrow，否则会被秒杀）
+  riftGrow:   1.06,   // 裂隙共鸣：每深入一层，永久全属性倍率（略高于 monAtkGrow）
   farmDecay:  0.08,   // 低于最深纪录每层，收益衰减 8%
   farmMin:    0.20,   // 收益衰减下限
   spdMax:     24,     // 攻速升级上限（0.92^24 ≈ 0.135）
   critMax:    75,     // 暴击率上限
   minInterval:160,    // 攻击间隔下限（毫秒），防止无限连击
   advSecLimit:45,     // 单场超过这么多秒就原地刷，不再自动深入
-  advFastSec:  9,     // 单场快于这个秒数，算"打得动"
+  advFastSec:  12,    // 单场快于这个秒数，算"打得动"
   advFastNeed: 3,     // 连续几只打得动就自动上一层
+  forceAdvAfter: 6,   // 连续这么多只都慢，也硬推一层（探测），防止永久卡死
+  retreatSec:  50,    // 单只打超过这么久还没打死，回退一层
   floorCap:   999,
 };
 
@@ -521,7 +525,7 @@ const R = {
   poisonStack:0, lacStack:0,
   cds:{},
   fightStart:0, fightSkillUses:0,
-  fightId:0, slKey:'', reviveAt:0, fastKills:0,
+  fightId:0, slKey:'', reviveAt:0, fastKills:0, slowKills:0,
   paused:false, evOpts:[], evUntil:0,
   regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0, affixSuppress:false,
   rushUntil:0, armorStrong:false, reflectNext:false,
@@ -549,9 +553,9 @@ function curMon(){
   if(ev.noAffix || R.affixSuppress) aff = [];
   return {name:t.name, emoji:t.emoji, skill:t.skill,
     affixes: aff,
-    hpMax: Math.round(b.hp * evHp),
+    hpMax: Math.round(b.hp * evHp * (S.floorIdx < 8 ? 1 : CFG.hpScale)),
     atk: Math.round(b.atk * evAtk),
-    ess: Math.round(b.ess * evEss)};
+    ess: Math.round(b.ess * evEss * CFG.essScale)};
 }
 
 // ---------- 派生 ----------
@@ -723,6 +727,7 @@ function killMonster(){
   const expGain = Math.max(1, Math.round(m.ess * CFG.expRatio * farmMul));
 
   S.ess += essGain; S.totalEss += essGain;
+  S.lastFight = {t: parseFloat(dur), name: m.name, uses: R.fightSkillUses};
   S.kills[m.name] = (S.kills[m.name] || 0) + 1;
   const k = S.kills[m.name];
   gainExp(expGain);
@@ -753,17 +758,24 @@ function killMonster(){
   // 自动推进：看「击杀速度」，不看「击杀数量」
   R.killGate++;
   const fast = parseFloat(dur) <= CFG.advFastSec;
-  if(fast) R.fastKills = (R.fastKills || 0) + 1;
-  else R.fastKills = 0;
+  if(fast){ R.fastKills = (R.fastKills || 0) + 1; R.slowKills = 0; }
+  else { R.fastKills = 0; R.slowKills = (R.slowKills || 0) + 1; }
 
   if(S.autoAdv && R.fastKills >= CFG.advFastNeed && R.killGate >= KILLS_PER_TRAIT){
     R.fastKills = 0;
     advance(true);
     return;
   }
+  // 探测式推进：慢杀累积到阈值也硬上一层的，避免永久卡死在同一层
+  if(S.autoAdv && !fast && R.slowKills >= CFG.forceAdvAfter){
+    R.slowKills = 0;
+    log('【探测】这一层杀不动了，向上试一层', 'c-skill');
+    advance(true);
+    return;
+  }
   if(!fast && R.killGate >= 3 && !R.slowNoticed){
     R.slowNoticed = true;
-    log('【停滞】这一层杀得慢，自动改为原地刷精华（变强后会自己上）', 'c-bad');
+    log('【停滞】这一层杀得慢，先原地刷精华（攒够了会自己往上试）', 'c-bad');
   }
   startFight(); save();
 }
@@ -1110,6 +1122,14 @@ function tick(dt){
   if(!R.dead && R.monHp > 0){
     R.monTimer += dt;
     if(R.monTimer >= 1700){ R.monTimer = 0; monsterAttack(); }
+    // 卡死保护：单只打太久，回退一层
+    if((now() - R.fightStart)/1000 > CFG.retreatSec && S.floorIdx > 0){
+      S.floorIdx--;
+      S.monIdx = curFloor().monsters.length - 1;
+      R.killGate = 0; R.fastKills = 0; R.slowKills = 0;
+      log('【回退】这层打不死，退回上一层刷精华', 'c-bad');
+      startFight();
+    }
   }
 }
 
