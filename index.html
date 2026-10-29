@@ -187,6 +187,7 @@ body{
     <div class="row"><span class="k">攻击倍率</span><span class="v" id="atkMul">×1.00</span></div>
     <div class="row"><span class="k">精华倍率</span><span class="v" id="essMul">×1.00</span></div>
     <div class="row"><span class="k">裂隙共鸣</span><span class="v" id="riftMul">×1.00</span></div>
+    <div class="row"><span class="k">存档</span><span class="v" onclick="resetGame()" style="color:#e0a0a0;cursor:pointer;font-size:12px">重置重开 ›</span></div>
     <div class="row"><span class="k">本层收益</span><span class="v" id="farmMul">×1.00</span></div>
   </div>
 
@@ -1442,6 +1443,16 @@ window.setGem = function(skillId, idx, gemId){
   closePicker();
 };
 window.closeOffline = function(){ document.getElementById('offlineBox').classList.remove('on'); };
+
+window.resetGame = function(){
+  if(!confirm('确认重置全部进度？会重新发初始技能，此操作不可撤销。')) return;
+  localStorage.removeItem(SAVE_KEY);
+  S = freshState();
+  R.cds = {}; R.fightId++; R.dead = false; R.paused = false;
+  R.killGate = 0; R.fastKills = 0; R.affixSuppress = false;
+  startFight(); save();
+  log('进度已重置：初始技能「噬咬」+ 词条「锋利」已发放。', 'c-epic');
+};
 
 // ============================================================
 // 交互
