@@ -168,6 +168,7 @@ body{
     <div class="mon-name" id="monName">铁皮鼠</div>
     <div class="mon-stage" id="monStage">已吞噬 0 / 10</div>
     <div id="affixRow" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div id="stackRow" style="display:flex;gap:8px;justify-content:center;font-size:11px;margin-bottom:6px"></div>
     <div class="bar"><div class="bar-fill hp-mon" id="monHpBar" style="width:100%"></div>
       <div class="bar-txt" id="monHpTxt">20 / 20</div></div>
     <div class="bar" style="height:12px;margin-top:3px"><div class="bar-fill hp-me" id="meHpBar" style="width:100%"></div>
@@ -195,7 +196,12 @@ body{
   </div>
 
   <div class="panel">
-    <h3>联动 <span class="hint" id="synHint">0 / 6 已激活</span></h3>
+    <h3>词条 <span class="hint" id="gemHint">每技能 1 槽</span></h3>
+    <div id="gemList"></div>
+  </div>
+
+  <div class="panel">
+    <h3>联动 <span class="hint" id="synHint">0 / 7 已激活</span></h3>
     <div id="synList"></div>
   </div>
 
@@ -397,22 +403,49 @@ const EVENTS = [
 // need = 必须"已吞噬"的技能（增幅层不占槽位）
 // ----------
 const SYNERGY = [
-  {id:'corrode', chain:'毒蚀', icon:'☠', name:'腐蚀',
-   need:['venom','rend'], desc:'裂爪命中中毒目标：伤害 +60%，并挂「裂伤」4 秒',
-   amp:['crush'], ampDesc:'持有碎骨：裂伤延长到 6 秒'},
+  {id:'corrode', chain:'毒蚀', icon:'☠', name:'转化',
+   need:['venom','rend'], desc:'裂爪消耗 1 层毒，转化为 2 层裂伤',
+   amp:['crush'], ampDesc:'持有碎骨：碎骨引爆裂伤，每层 +35% 伤害'},
   {id:'linkage', chain:'毒蚀', icon:'🔗', name:'碎链',
-   need:['rend','triple'], desc:'连斩命中「裂伤」目标：每段伤害 +50%'},
+   need:['rend','triple'], desc:'连斩命中裂伤目标：每段 +50%，并消耗 1 层裂伤'},
   {id:'edge', chain:'毒蚀', icon:'✨', name:'锐意',
-   need:['triple','crush'], desc:'连斩打掉裂伤后 3 秒内，碎骨伤害 ×2 且不再自损'},
+   need:['triple','crush'], desc:'连斩之后 3 秒内，碎骨 ×2 且不再自损'},
   {id:'bulwark', chain:'坚壁', icon:'🛡', name:'坚壁',
-   need:['harden','ironwall'], desc:'护盾存在时施放铁壁：减伤提升到 70%，并反弹下一次攻击'},
+   need:['harden','ironwall'], desc:'护盾存在时施放铁壁：减伤 70%，并反弹下一次攻击'},
   {id:'selfheal', chain:'坚壁', icon:'🩸', name:'自愈',
-   need:['ironwall','bloodthirst'], desc:'铁壁期间嗜血：回血翻倍，并立刻刷新硬化冷却'},
+   need:['ironwall','bloodthirst'], desc:'铁壁期间嗜血：回血翻倍，并刷新硬化冷却'},
   {id:'storm', chain:'疾风', icon:'⚡', name:'疾风连段',
    need:['haste','triple'], desc:'疾风期间连斩：段数 3 → 5'},
+  {id:'soulnet', chain:'噬魂', icon:'🌀', name:'魂网',
+   need:['soul'], desc:'持有噬魂：全部技能冷却 ×0.9'},
 ];
 function synActive(sy){ return sy.need.every(function(k){ return S.skills.indexOf(k) >= 0; }); }
 function synAmp(sy){ return !!(sy.amp && sy.amp.every(function(k){ return S.skills.indexOf(k) >= 0; })); }
+
+
+// ============================================================
+// 词条宝石：每个都是「增益 + 代价」
+// ============================================================
+const GEMS = {
+  overload: {name:'过载', icon:'💥', gain:'伤害 +60%',        cost:'冷却 +50%',
+             dmg:1.6, cd:1.5},
+  sharpen:  {name:'锐化', icon:'🎯', gain:'暴击率 +25%',      cost:'伤害 -10%',
+             dmg:0.9, critAdd:25},
+  swift:    {name:'迅捷', icon:'⚡', gain:'冷却 -30%',        cost:'伤害 -25%',
+             dmg:0.75, cd:0.7},
+  gluttony: {name:'贪食', icon:'🍽', gain:'精华 +60%',        cost:'伤害 -25%',
+             dmg:0.75, essMul:1.6},
+  venomous: {name:'淬毒', icon:'☠', gain:'命中附 2 层毒',     cost:'伤害 -15%',
+             dmg:0.85, poison:2},
+  rendarm:  {name:'破甲', icon:'🪓', gain:'命中附 2 层裂伤',  cost:'伤害 -10%',
+             dmg:0.9, lac:2},
+  split:    {name:'分裂', icon:'🔀', gain:'命中裂成 2 段',     cost:'每段 50%、总伤 -20%',
+             dmg:0.8, split:true},
+  detonate: {name:'引爆', icon:'💣', gain:'消耗全部毒层一次结算', cost:'冷却 +30%',
+             dmg:1.0, cd:1.3, detonate:true},
+};
+const GEM_SLOTS_BY_LV = 1;     // 1 槽起步
+const GEM_SLOT2_LV = 31;       // 战将级开第二槽
 
 const KILLS_PER_TRAIT = 10;
 const SLOT_UNLOCK = [4, 7];
@@ -430,6 +463,7 @@ function freshState(){
     floorIdx:0, monIdx:0,
     kills:{}, skills:[],
     slots:[{skill:null,cond:'always'},{skill:null,cond:'always'},{skill:null,cond:'always'}],
+    gems:{},                                  // 技能 → [词条id, 词条id]
     atk:5, hpMax:50, hp:50, crit:5, spdLv:0,
     upAtkLv:0, upHpLv:0, upCritLv:0,
     autoAdv:true, bestFloor:0,
@@ -448,13 +482,14 @@ const R = {
   monHp:0, monHpMax:1,
   monTimer:0, atkTimer:0, atkCount:0,
   shield:0,
-  hasteUntil:0, armorUntil:0, poisonUntil:0, poisonDps:0, poisonAcc:0,
+  hasteUntil:0, armorUntil:0, poisonAcc:0,
+  poisonStack:0, lacStack:0,
   cds:{},
   fightStart:0, fightSkillUses:0,
   fightId:0, slKey:'', reviveAt:0,
   paused:false, evOpts:[], evUntil:0,
   regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0, affixSuppress:false,
-  lacUntil:0, rushUntil:0, armorStrong:false, reflectNext:false,
+  rushUntil:0, armorStrong:false, reflectNext:false,
   killGate:0,               // 自动推进：本层已杀多少只
   dead:false,
 };
@@ -562,6 +597,7 @@ function load(){
       S = Object.assign(freshState(), p);
       if(!Array.isArray(S.slots) || S.slots.length !== 3) S.slots = freshState().slots;
       if(!Array.isArray(S.skills)) S.skills = [];
+      if(!S.gems || typeof S.gems !== 'object') S.gems = {};
       return true;
     }
   }catch(e){}
@@ -578,7 +614,8 @@ function startFight(){
   R.monTimer = 0; R.atkTimer = 0; R.atkCount = 0;
   R.shield = 0;
   R.regenTimer = 0; R.meBurnUntil = 0; R.meBurnAcc = 0;
-  R.lacUntil = 0; R.rushUntil = 0; R.armorStrong = false; R.reflectNext = false;
+  R.poisonStack = 0; R.lacStack = 0; R.poisonAcc = 0;
+  R.rushUntil = 0; R.armorStrong = false; R.reflectNext = false;
   R.fightStart = now(); R.fightSkillUses = 0;
   R.fightId++;
   render();
@@ -646,7 +683,7 @@ function killMonster(){
   const dur = ((now() - R.fightStart)/1000).toFixed(1);
   const deepGap = Math.max(0, S.bestFloor - S.floorIdx);   // 比最深纪录低几层
   const farmMul = Math.max(CFG.farmMin, 1 - CFG.farmDecay*deepGap);
-  const essGain = Math.round(m.ess * D.essMul * farmMul);
+  const essGain = Math.round(m.ess * D.essMul * farmMul * gemEssBonus());
   const expGain = Math.max(1, Math.round(m.ess * CFG.expRatio * farmMul));
 
   S.ess += essGain; S.totalEss += essGain;
@@ -827,12 +864,58 @@ function monsterAttack(){
   markDirty();
 }
 
+function gemMods(id){
+  const gs = S.gems[id] || [];
+  const m = {dmg:1, cd:1, critAdd:0, essMul:1, split:false, poison:0, lac:0, detonate:false};
+  gs.forEach(function(g){
+    const G = GEMS[g];
+    if(!G) return;
+    m.dmg *= (G.dmg || 1);
+    m.cd *= (G.cd || 1);
+    m.critAdd += (G.critAdd || 0);
+    m.essMul *= (G.essMul || 1);
+    if(G.split) m.split = true;
+    m.poison += (G.poison || 0);
+    m.lac += (G.lac || 0);
+    if(G.detonate) m.detonate = true;
+  });
+  return m;
+}
+
+function gemEssBonus(){
+  let mul = 1;
+  S.slots.forEach(function(sl){
+    if(!sl.skill) return;
+    (S.gems[sl.skill] || []).forEach(function(g){
+      const G = GEMS[g];
+      if(G && G.essMul) mul *= G.essMul;
+    });
+  });
+  return mul;
+}
+
+// 统一出伤：暴击、裂伤易伤、分裂、附毒/附裂伤
+function hit(base, tag, m){
+  const D = derived();
+  const segs = m.split ? 2 : 1;
+  const per = (m.split ? base*0.5 : base) * m.dmg;
+  for(let i=0;i<segs;i++){
+    if(R.monHp <= 0) break;
+    const crit = Math.random()*100 < (D.crit + m.critAdd);
+    const dmg = per * (crit ? D.critDmg : 1) * (1 + R.lacStack*0.06);
+    if(m.poison) R.poisonStack = Math.min(20, R.poisonStack + m.poison);
+    if(m.lac) R.lacStack = Math.min(10, R.lacStack + m.lac);
+    damageMonster(Math.round(dmg), (tag || '') + (crit ? '·暴' : ''));
+  }
+}
+
 function castSkill(id){
   const D = derived();
   const sk = SKILLS[id];
   const m = curMon();
-  const cdCut = (S.skills.indexOf('soul') >= 0) ? 0.9 : 1;   // 噬魂增幅
-  R.cds[id] = now() + sk.cd * cdCut;
+  const gm = gemMods(id);
+  const cdCut = (S.skills.indexOf('soul') >= 0) ? 0.9 : 1;
+  R.cds[id] = now() + sk.cd * cdCut * gm.cd;
   R.fightSkillUses++;
 
   if(id === 'harden'){
@@ -840,61 +923,56 @@ function castSkill(id){
   } else if(id === 'bloodthirst'){
     let heal = Math.round(D.hpMax*0.1);
     const sh = SYNERGY.find(function(x){ return x.id==='selfheal'; });
-    if(synActive(sh) && now() < R.armorUntil){
-      heal *= 2;
-      R.cds['harden'] = 0;               // 刷新硬化
-    }
+    if(synActive(sh) && now() < R.armorUntil){ heal *= 2; R.cds['harden'] = 0; }
     S.hp = Math.min(D.hpMax, S.hp + heal);
-    floatDmg('+' + heal, 'skill');
+    floatDmg('+' + fmt(heal), 'skill');
   } else if(id === 'haste'){
     R.hasteUntil = now() + 5000;
   } else if(id === 'rend'){
-    let dmg = D.atk*2.2;
-    let tag = '裂爪';
-    const poisoned = now() < R.poisonUntil;
-    const corrode = SYNERGY.find(function(x){ return x.id==='corrode'; });
-    if(poisoned && synActive(corrode)){ dmg *= 1.6; tag = '腐蚀裂爪'; }
-    // 挂裂伤（碎骨在场则延长）
-    const lacMs = (synActive(corrode) && synAmp(corrode)) ? 6000 : 4000;
-    if(poisoned && synActive(corrode)) R.lacUntil = now() + lacMs;
-    damageMonster(Math.round(dmg), tag);
+    if(R.poisonStack > 0){ R.poisonStack--; R.lacStack = Math.min(10, R.lacStack + 2); }
+    hit(D.atk*2.2, '裂爪', gm);
   } else if(id === 'venom'){
-    R.poisonUntil = now() + 6000; R.poisonDps = Math.max(1, Math.round(D.atk*0.3));
+    R.poisonStack = Math.min(20, R.poisonStack + 4);
+    hit(D.atk*0.8, '淬毒', gm);
   } else if(id === 'ironwall'){
     R.armorUntil = now() + 5000;
     const bw = SYNERGY.find(function(x){ return x.id==='bulwark'; });
     if(synActive(bw) && R.shield > 0){ R.armorStrong = true; R.reflectNext = true; }
   } else if(id === 'triple'){
-    const lac = now() < R.lacUntil;
+    const lac = R.lacStack > 0;
     const linkage = synActive(SYNERGY.find(function(x){ return x.id==='linkage'; }));
     const storm = synActive(SYNERGY.find(function(x){ return x.id==='storm'; }));
-    let hits = (storm && now() < R.hasteUntil) ? 5 : 3;
+    const hits = (storm && now() < R.hasteUntil) ? 5 : 3;
     let per = D.atk*0.6;
-    let tag = '连斩';
-    if(lac && linkage){ per *= 1.5; tag = '碎链连斩'; }
-    if(lac){ R.lacUntil = 0; R.rushUntil = now() + 3000; }
-    (function(fid, hits, per, tag){
-      for(let i=0;i<hits;i++){
+    if(lac && linkage) per *= 1.5;
+    if(lac){ R.lacStack = Math.max(0, R.lacStack - 1); R.rushUntil = now()+3000; }
+    (function(fid, n, base, mm){
+      for(let i=0;i<n;i++){
         setTimeout(function(){
           if(fid !== R.fightId) return;
-          if(R.monHp > 0) damageMonster(Math.round(per), tag);
+          if(R.monHp > 0) hit(base, '连斩', mm);
         }, i*130);
       }
-    })(R.fightId, hits, per, tag);
+    })(R.fightId, hits, per, gm);
   } else if(id === 'crush'){
-    let dmg = D.atk*3.0;
-    let tag = '碎骨';
     const exe = SYNERGY.find(function(x){ return x.id==='edge'; });
     const rush = synActive(exe) && now() < R.rushUntil;
-    if(rush){ dmg *= 2; tag = '锐意碎骨'; }
-    // 增幅：持有裂爪 → 碎骨必暴
-    if(S.skills.indexOf('rend') >= 0){ dmg *= D.critDmg; tag += '·暴'; }
-    damageMonster(Math.round(dmg), tag);
+    const consumed = R.lacStack;
+    const base = D.atk*3.0 * (rush ? 2 : 1) * (1 + consumed*0.35);
+    R.lacStack = 0;
+    hit(base, rush ? '锐意碎骨' : '碎骨', gm);
     if(!rush && S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
   } else if(id === 'soul'){
-    const g = Math.round(m.ess*3*D.essMul);
+    const bonus = 1 + R.poisonStack*0.15;
+    const g = Math.round(m.ess*3*D.essMul*bonus);
     S.ess += g;
-    floatDmg('+' + g + '精华', 'skill');
+    floatDmg('+' + fmt(g) + '精华', 'skill');
+  }
+
+  if(gm.detonate && R.poisonStack > 0 && R.monHp > 0){
+    const st = R.poisonStack;
+    R.poisonStack = 0;
+    damageMonster(Math.round(st * D.atk), '引爆×' + st);
   }
 
   let condLabel = '无条件';
@@ -969,11 +1047,12 @@ function tick(dt){
       markDirty();
     }
   }
-  if(R.monHp > 0 && now() < R.poisonUntil){
+  if(R.monHp > 0 && R.poisonStack > 0){
     R.poisonAcc += dt;
     if(R.poisonAcc >= 1000){
       R.poisonAcc = 0;
-      damageMonster(R.poisonDps, '毒');
+      const Dp = derived();
+      damageMonster(Math.max(1, Math.round(R.poisonStack * Dp.atk * 0.02)), '毒×' + R.poisonStack);
     }
   }
   if(!R.dead && R.monHp > 0){
@@ -1139,6 +1218,56 @@ function render(){
     if(hint) hint.textContent = on + ' / ' + SYNERGY.length + ' 已激活';
   }
 
+  // 叠层
+  const sr = document.getElementById('stackRow');
+  const stacks = [];
+  if(R.poisonStack > 0) stacks.push('<span style="color:#7dd3a0">☠ 毒 ×' + R.poisonStack + '</span>');
+  if(R.lacStack > 0) stacks.push('<span style="color:#f0a0a0">🩸 裂伤 ×' + R.lacStack + '</span>');
+  if(R.shield > 0) stacks.push('<span style="color:#8fb8f0">🛡 盾 ' + fmt(R.shield) + '</span>');
+  sr.innerHTML = stacks.join('');
+
+  // 词条面板
+  const gl = document.getElementById('gemList');
+  const equipped = [];
+  S.slots.forEach(function(sl){ if(sl.skill && equipped.indexOf(sl.skill) < 0) equipped.push(sl.skill); });
+  const slotN = S.lv >= GEM_SLOT2_LV ? 2 : 1;
+  const gh = document.getElementById('gemHint');
+  if(gh) gh.textContent = slotN === 1 ? '每技能 1 槽（战将级开第 2 槽）' : '每技能 2 槽';
+  const gemKey = equipped.join(',') + '|' + slotN + '|' +
+    equipped.map(function(k){ return (S.gems[k]||[]).join('+'); }).join(',');
+  if(gl.dataset.k !== gemKey){
+    gl.dataset.k = gemKey;
+    if(!equipped.length){
+      gl.innerHTML = '<div class="slot empty" style="cursor:default"><div class="sicon">◇</div>' +
+        '<div class="sinfo"><div class="sname none">还没有技能</div>' +
+        '<div class="scond">先在「战术」里配置技能，才能给它插词条</div></div></div>';
+    } else {
+      gl.innerHTML = equipped.map(function(sk){
+        const skObj = SKILLS[sk];
+        const gems = S.gems[sk] || [];
+        let chips = '';
+        for(let i=0;i<slotN;i++){
+          const gid = gems[i];
+          if(gid){
+            const G = GEMS[gid];
+            chips += '<span onclick="openGemPicker(\'' + sk + '\',' + i + ')" ' +
+              'style="cursor:pointer;font-size:10.5px;padding:3px 7px;border-radius:20px;' +
+              'background:rgba(122,92,214,.18);border:1px solid rgba(122,92,214,.5);color:#c4a5ff">' +
+              G.icon + ' ' + G.name + '</span>';
+          } else {
+            chips += '<span onclick="openGemPicker(\'' + sk + '\',' + i + ')" ' +
+              'style="cursor:pointer;font-size:10.5px;padding:3px 7px;border-radius:20px;' +
+              'background:rgba(30,43,61,.6);border:1px dashed #3d4d61;color:#5a6b80">＋ 空槽</span>';
+          }
+        }
+        return '<div class="slot" style="cursor:default;align-items:center">' +
+          '<div class="sicon">' + skObj.icon + '</div>' +
+          '<div class="sinfo"><div class="sname" style="color:#c8d3e0">' + skObj.name + '</div>' +
+          '<div class="scond" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">' + chips + '</div></div></div>';
+      }).join('');
+    }
+  }
+
   document.getElementById('sAtk').textContent = fmt(D.atk);
   document.getElementById('sHp').textContent = fmt(S.hp) + ' / ' + fmt(D.hpMax);
   document.getElementById('sCrit').textContent = D.crit + '%';
@@ -1224,6 +1353,38 @@ window.setSlotSkill = function(i, id){
 window.setSlotCond = function(i, cond){ S.slots[i].cond = cond; render(); save(); };
 window.clearSlot = function(i){ S.slots[i].skill = null; render(); save(); };
 window.closePicker = function(){ document.getElementById('overlay').classList.remove('on'); };
+
+window.openGemPicker = function(skillId, idx){
+  const sk = SKILLS[skillId];
+  const cur = (S.gems[skillId] || [])[idx] || null;
+  const html = '<h4>' + sk.name + ' · 词条槽 ' + (idx+1) + '</h4>' +
+    '<div class="od" style="color:#5a6b80;font-size:11px;margin-bottom:10px">' +
+    '每个词条都有代价，绿字是增益，红字是代价</div>' +
+    Object.keys(GEMS).map(function(g){
+      const G = GEMS[g];
+      const sel = cur === g;
+      return '<div class="opt ' + (sel ? 'sel' : '') + '" onclick="setGem(\'' + skillId + '\',' + idx + ',\'' + g + '\')">' +
+        '<div class="oi">' + G.icon + '</div>' +
+        '<div class="ot">' + G.name +
+          '<div class="od"><span style="color:#a7e3bd">' + G.gain + '</span> / ' +
+          '<span style="color:#e0a0a0">' + G.cost + '</span></div></div>' +
+        (sel ? '<div class="od" style="color:#c4a5ff">已装备</div>' : '') + '</div>';
+    }).join('') +
+    '<div class="opt" onclick="setGem(\'' + skillId + '\',' + idx + ',null)"><div class="oi">✕</div>' +
+    '<div class="ot">取下词条</div></div>' +
+    '<button class="close" onclick="closePicker()">完成</button>';
+  document.getElementById('sheet').innerHTML = html;
+  document.getElementById('overlay').classList.add('on');
+};
+
+window.setGem = function(skillId, idx, gemId){
+  const arr = S.gems[skillId] || [];
+  if(gemId) arr[idx] = gemId; else delete arr[idx];
+  S.gems[skillId] = arr;
+  render(); save();
+  if(gemId) log('【词条】' + SKILLS[skillId].name + ' 装上 ' + GEMS[gemId].name, 'c-skill');
+  closePicker();
+};
 window.closeOffline = function(){ document.getElementById('offlineBox').classList.remove('on'); };
 
 // ============================================================
