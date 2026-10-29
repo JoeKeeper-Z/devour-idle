@@ -296,15 +296,15 @@ function floorDef(f){            // f 从 0 开始
 // 技能表
 // ============================================================
 const SKILLS = {
-  harden:      {name:'硬化', icon:'🛡', cd:7000,  desc:'获得最大生命 20% 的护盾'},
-  bloodthirst: {name:'嗜血', icon:'🩸', cd:6000,  desc:'立即回复 10% 生命'},
-  haste:       {name:'疾风', icon:'⚡', cd:13000, desc:'5 秒内攻速 ×2'},
-  rend:        {name:'裂爪', icon:'🗡', cd:6000,  desc:'一次 220% 攻击力的重击'},
-  venom:       {name:'淬毒', icon:'☠', cd:8000,  desc:'中毒 6 秒，每秒 30% 攻击力'},
-  ironwall:    {name:'铁壁', icon:'🪨', cd:14000, desc:'5 秒内受到伤害 -50%'},
-  triple:      {name:'连斩', icon:'✨', cd:7000,  desc:'连续 3 次 60% 攻击力攻击'},
-  crush:       {name:'碎骨', icon:'💥', cd:10000, desc:'300% 攻击力，自损 5% 生命'},
-  soul:        {name:'噬魂', icon:'🌀', cd:16000, desc:'立即获得 3 倍怪物精华'},
+  harden:      {name:'硬化', icon:'🛡', cd:7000,  desc:'获得最大生命 22% 的护盾'},
+  bloodthirst: {name:'嗜血', icon:'🩸', cd:6000,  desc:'立即回复 12% 生命'},
+  haste:       {name:'疾风', icon:'⚡', cd:13000, desc:'6 秒内攻速 ×2'},
+  rend:        {name:'裂爪', icon:'🗡', cd:5000,  desc:'520% 攻击力重击；消耗 1 层毒转 2 层裂伤'},
+  venom:       {name:'淬毒', icon:'☠', cd:7000,  desc:'260% 攻击力 + 5 层毒'},
+  ironwall:    {name:'铁壁', icon:'🪨', cd:14000, desc:'6 秒内受到伤害 -50%'},
+  triple:      {name:'连斩', icon:'✨', cd:6000,  desc:'连续 3 次 150% 攻击力攻击'},
+  crush:       {name:'碎骨', icon:'💥', cd:9000, desc:'680% 攻击力 + 引爆全部裂伤（每层 +35%）'},
+  soul:        {name:'噬魂', icon:'🌀', cd:16000, desc:'获得 3.5 倍怪物精华（毒层每层再 +15%）'},
 };
 
 const CONDS = {
@@ -346,13 +346,15 @@ const CFG = {
   upPowGrow:  1.03,   // 升级效果倍率（几何成长，防数值墙）
   expGrow:    1.28,   // 每级所需经验成长
   expRatio:   0.5,    // 经验 = 精华 × 系数
-  riftGrow:   1.08,   // 裂隙共鸣：每深入一层，永久全属性倍率（必须低于 hpGrow）
+  riftGrow:   1.105,  // 裂隙共鸣：每深入一层，永久全属性倍率（≥monAtkGrow，否则会被秒杀）
   farmDecay:  0.08,   // 低于最深纪录每层，收益衰减 8%
   farmMin:    0.20,   // 收益衰减下限
   spdMax:     24,     // 攻速升级上限（0.92^24 ≈ 0.135）
   critMax:    75,     // 暴击率上限
   minInterval:160,    // 攻击间隔下限（毫秒），防止无限连击
   advSecLimit:45,     // 单场超过这么多秒就原地刷，不再自动深入
+  advFastSec:  9,     // 单场快于这个秒数，算"打得动"
+  advFastNeed: 3,     // 连续几只打得动就自动上一层
   floorCap:   999,
 };
 
@@ -427,25 +429,49 @@ function synAmp(sy){ return !!(sy.amp && sy.amp.every(function(k){ return S.skil
 // 词条宝石：每个都是「增益 + 代价」
 // ============================================================
 const GEMS = {
-  overload: {name:'过载', icon:'💥', gain:'伤害 +60%',        cost:'冷却 +50%',
+  // ---- 初级（Lv.1 解锁）：代价小，先让玩家感受到"改造" ----
+  edge1:    {name:'锋利', icon:'🔸', tier:'basic', gain:'伤害 +20%',    cost:'冷却 +10%',
+             dmg:1.2,  cd:1.1},
+  focus:    {name:'专精', icon:'🎯', tier:'basic', gain:'暴击率 +10%',  cost:'伤害 -5%',
+             dmg:0.95, critAdd:10},
+  greed:    {name:'觅食', icon:'🌿', tier:'basic', gain:'精华 +25%',    cost:'伤害 -8%',
+             dmg:0.92, essMul:1.25},
+  light:    {name:'轻装', icon:'🍃', tier:'basic', gain:'冷却 -12%',    cost:'伤害 -10%',
+             dmg:0.9,  cd:0.88},
+
+  // ---- 中级（Lv.11 解锁）：更猛，代价也更疼 ----
+  overload: {name:'过载', icon:'💥', tier:'mid', gain:'伤害 +60%',        cost:'冷却 +50%',
              dmg:1.6, cd:1.5},
-  sharpen:  {name:'锐化', icon:'🎯', gain:'暴击率 +25%',      cost:'伤害 -10%',
+  sharpen:  {name:'锐化', icon:'🎯', tier:'mid', gain:'暴击率 +25%',      cost:'伤害 -10%',
              dmg:0.9, critAdd:25},
-  swift:    {name:'迅捷', icon:'⚡', gain:'冷却 -30%',        cost:'伤害 -25%',
+  swift:    {name:'迅捷', icon:'⚡', tier:'mid', gain:'冷却 -30%',        cost:'伤害 -25%',
              dmg:0.75, cd:0.7},
-  gluttony: {name:'贪食', icon:'🍽', gain:'精华 +60%',        cost:'伤害 -25%',
+  gluttony: {name:'贪食', icon:'🍽', tier:'mid', gain:'精华 +60%',        cost:'伤害 -25%',
              dmg:0.75, essMul:1.6},
-  venomous: {name:'淬毒', icon:'☠', gain:'命中附 2 层毒',     cost:'伤害 -15%',
+  venomous: {name:'淬毒', icon:'☠', tier:'mid', gain:'命中附 2 层毒',     cost:'伤害 -15%',
              dmg:0.85, poison:2},
-  rendarm:  {name:'破甲', icon:'🪓', gain:'命中附 2 层裂伤',  cost:'伤害 -10%',
+  rendarm:  {name:'破甲', icon:'🪓', tier:'mid', gain:'命中附 2 层裂伤',  cost:'伤害 -10%',
              dmg:0.9, lac:2},
-  split:    {name:'分裂', icon:'🔀', gain:'命中裂成 2 段',     cost:'每段 50%、总伤 -20%',
+  split:    {name:'分裂', icon:'🔀', tier:'mid', gain:'命中裂成 2 段',     cost:'总伤 -20%',
              dmg:0.8, split:true},
-  detonate: {name:'引爆', icon:'💣', gain:'消耗全部毒层一次结算', cost:'冷却 +30%',
+  detonate: {name:'引爆', icon:'💣', tier:'mid', gain:'消耗全部毒层一次结算', cost:'冷却 +30%',
              dmg:1.0, cd:1.3, detonate:true},
 };
-const GEM_SLOTS_BY_LV = 1;     // 1 槽起步
-const GEM_SLOT2_LV = 31;       // 战将级开第二槽
+
+// 词条槽：等级到线自动开
+const GEM_SLOT_TIERS = [
+  {lv:1,  slots:1},
+  {lv:11, slots:2},
+  {lv:31, slots:3},
+  {lv:61, slots:4},
+];
+const GEM_TIER_UNLOCK = {basic:1, mid:11};
+function gemSlots(){
+  let n = 1;
+  GEM_SLOT_TIERS.forEach(function(t){ if(S.lv >= t.lv) n = t.slots; });
+  return n;
+}
+function gemUnlocked(G){ return S.lv >= (GEM_TIER_UNLOCK[G.tier] || 1); }
 
 const KILLS_PER_TRAIT = 10;
 const SLOT_UNLOCK = [4, 7];
@@ -486,7 +512,7 @@ const R = {
   poisonStack:0, lacStack:0,
   cds:{},
   fightStart:0, fightSkillUses:0,
-  fightId:0, slKey:'', reviveAt:0,
+  fightId:0, slKey:'', reviveAt:0, fastKills:0,
   paused:false, evOpts:[], evUntil:0,
   regenTimer:0, meBurnUntil:0, meBurnDps:0, meBurnAcc:0, affixSuppress:false,
   rushUntil:0, armorStrong:false, reflectNext:false,
@@ -714,20 +740,20 @@ function killMonster(){
     }
   }
 
-  // 自动推进：打得太慢就原地刷，不再硬顶
+  // 自动推进：看「击杀速度」，不看「击杀数量」
   R.killGate++;
-  const tooSlow = parseFloat(dur) > CFG.advSecLimit;
-  if(S.autoAdv && R.killGate >= KILLS_PER_TRAIT && !tooSlow){
-    R.killGate = 0;
+  const fast = parseFloat(dur) <= CFG.advFastSec;
+  if(fast) R.fastKills = (R.fastKills || 0) + 1;
+  else R.fastKills = 0;
+
+  if(S.autoAdv && R.fastKills >= CFG.advFastNeed){
+    R.fastKills = 0;
     advance(true);
     return;
   }
-  if(tooSlow && R.killGate >= KILLS_PER_TRAIT){
-    R.killGate = 0;
-    if(!R.slowNoticed){
-      R.slowNoticed = true;
-      log('【停滞】这一层打得太慢，自动改为原地刷精华（攒够再推进）', 'c-bad');
-    }
+  if(!fast && R.killGate >= 3 && !R.slowNoticed){
+    R.slowNoticed = true;
+    log('【停滞】这一层杀得慢，自动改为原地刷精华（变强后会自己上）', 'c-bad');
   }
   startFight(); save();
 }
@@ -808,7 +834,7 @@ function advance(silent){
     if(!silent) log('【进入】' + curFloor().name, 'c-epic');
     else log('【深入】进入 ' + curFloor().name + '（' + curFloor().tier + '）', 'c-epic');
   }
-  R.killGate = 0;
+  R.killGate = 0; R.fastKills = 0;
   startFight();
   maybeEvent();
   save();
@@ -919,23 +945,23 @@ function castSkill(id){
   R.fightSkillUses++;
 
   if(id === 'harden'){
-    R.shield += Math.round(D.hpMax*0.2);
+    R.shield += Math.round(D.hpMax*0.22);
   } else if(id === 'bloodthirst'){
-    let heal = Math.round(D.hpMax*0.1);
+    let heal = Math.round(D.hpMax*0.12);
     const sh = SYNERGY.find(function(x){ return x.id==='selfheal'; });
     if(synActive(sh) && now() < R.armorUntil){ heal *= 2; R.cds['harden'] = 0; }
     S.hp = Math.min(D.hpMax, S.hp + heal);
     floatDmg('+' + fmt(heal), 'skill');
   } else if(id === 'haste'){
-    R.hasteUntil = now() + 5000;
+    R.hasteUntil = now() + 6000;
   } else if(id === 'rend'){
     if(R.poisonStack > 0){ R.poisonStack--; R.lacStack = Math.min(10, R.lacStack + 2); }
-    hit(D.atk*2.2, '裂爪', gm);
+    hit(D.atk*5.2, '裂爪', gm);
   } else if(id === 'venom'){
-    R.poisonStack = Math.min(20, R.poisonStack + 4);
-    hit(D.atk*0.8, '淬毒', gm);
+    R.poisonStack = Math.min(20, R.poisonStack + 5);
+    hit(D.atk*2.6, '淬毒', gm);
   } else if(id === 'ironwall'){
-    R.armorUntil = now() + 5000;
+    R.armorUntil = now() + 6000;
     const bw = SYNERGY.find(function(x){ return x.id==='bulwark'; });
     if(synActive(bw) && R.shield > 0){ R.armorStrong = true; R.reflectNext = true; }
   } else if(id === 'triple'){
@@ -943,7 +969,7 @@ function castSkill(id){
     const linkage = synActive(SYNERGY.find(function(x){ return x.id==='linkage'; }));
     const storm = synActive(SYNERGY.find(function(x){ return x.id==='storm'; }));
     const hits = (storm && now() < R.hasteUntil) ? 5 : 3;
-    let per = D.atk*0.6;
+    let per = D.atk*1.5;
     if(lac && linkage) per *= 1.5;
     if(lac){ R.lacStack = Math.max(0, R.lacStack - 1); R.rushUntil = now()+3000; }
     (function(fid, n, base, mm){
@@ -958,13 +984,13 @@ function castSkill(id){
     const exe = SYNERGY.find(function(x){ return x.id==='edge'; });
     const rush = synActive(exe) && now() < R.rushUntil;
     const consumed = R.lacStack;
-    const base = D.atk*3.0 * (rush ? 2 : 1) * (1 + consumed*0.35);
+    const base = D.atk*6.8 * (rush ? 2 : 1) * (1 + consumed*0.35);
     R.lacStack = 0;
     hit(base, rush ? '锐意碎骨' : '碎骨', gm);
     if(!rush && S.hp > 1) S.hp = Math.max(1, S.hp - Math.round(D.hpMax*0.05));
   } else if(id === 'soul'){
     const bonus = 1 + R.poisonStack*0.15;
-    const g = Math.round(m.ess*3*D.essMul*bonus);
+    const g = Math.round(m.ess*3.5*D.essMul*bonus);
     S.ess += g;
     floatDmg('+' + fmt(g) + '精华', 'skill');
   }
@@ -1020,7 +1046,14 @@ function tick(dt){
     if(now() >= R.reviveAt){
       R.dead = false;
       S.hp = derived().hpMax;
-      R.monHp = R.monHpMax; R.fightStart = now(); R.fightSkillUses = 0;
+      // 重开一场：状态全部清空（毒/裂伤/护盾/灼烧/CD 计时）
+      R.monHp = R.monHpMax;
+      R.poisonStack = 0; R.lacStack = 0; R.poisonAcc = 0;
+      R.shield = 0; R.meBurnUntil = 0; R.meBurnAcc = 0;
+      R.hasteUntil = 0; R.armorUntil = 0; R.armorStrong = false; R.reflectNext = false;
+      R.rushUntil = 0; R.regenTimer = 0;
+      R.fightId++;
+      R.fightStart = now(); R.fightSkillUses = 0;
       markDirty();
     }
     return;
@@ -1099,8 +1132,8 @@ function render(){
   document.getElementById('monEmoji').textContent = m.emoji;
   document.getElementById('monName').textContent = m.name;
   const st = document.getElementById('monStage');
-  st.textContent = (hasSkill ? '已吞噬 · 技能已获得 · ' : '') +
-    '本层 ' + R.killGate + '/' + KILLS_PER_TRAIT + ' 只后推进';
+  st.textContent = (hasSkill ? '已吞噬 · ' : '') +
+    '连杀 ' + (R.fastKills||0) + '/' + CFG.advFastNeed + ' 只（' + CFG.advFastSec + ' 秒内）自动深入';
   st.style.color = hasSkill ? '#a78bfa' : '#5a6b80';
 
   // 词缀标签
@@ -1230,9 +1263,12 @@ function render(){
   const gl = document.getElementById('gemList');
   const equipped = [];
   S.slots.forEach(function(sl){ if(sl.skill && equipped.indexOf(sl.skill) < 0) equipped.push(sl.skill); });
-  const slotN = S.lv >= GEM_SLOT2_LV ? 2 : 1;
+  const slotN = gemSlots();
   const gh = document.getElementById('gemHint');
-  if(gh) gh.textContent = slotN === 1 ? '每技能 1 槽（战将级开第 2 槽）' : '每技能 2 槽';
+  if(gh){
+    const next = GEM_SLOT_TIERS.find(function(t){ return S.lv < t.lv; });
+    gh.textContent = '每技能 ' + slotN + ' 槽' + (next ? '（Lv.' + next.lv + ' 开 ' + next.slots + ' 槽）' : '');
+  }
   const gemKey = equipped.join(',') + '|' + slotN + '|' +
     equipped.map(function(k){ return (S.gems[k]||[]).join('+'); }).join(',');
   if(gl.dataset.k !== gemKey){
@@ -1357,19 +1393,28 @@ window.closePicker = function(){ document.getElementById('overlay').classList.re
 window.openGemPicker = function(skillId, idx){
   const sk = SKILLS[skillId];
   const cur = (S.gems[skillId] || [])[idx] || null;
+
+  function gemRow(g){
+    const G = GEMS[g];
+    const sel = cur === g;
+    const open = gemUnlocked(G);
+    const tag = !open ? ('Lv.' + GEM_TIER_UNLOCK[G.tier] + ' 解锁') : (sel ? '已装备' : '');
+    return '<div class="opt ' + (sel ? 'sel' : '') + ' ' + (open ? '' : 'lock') + '" ' +
+      (open ? 'onclick="setGem(\'' + skillId + '\',' + idx + ',\'' + g + '\')"' : '') + '>' +
+      '<div class="oi">' + G.icon + '</div>' +
+      '<div class="ot">' + G.name +
+        '<div class="od"><span style="color:#a7e3bd">' + G.gain + '</span> / ' +
+        '<span style="color:#e0a0a0">' + G.cost + '</span></div></div>' +
+      '<div class="od" style="color:' + (open ? '#c4a5ff' : '#5a6b80') + '">' + tag + '</div></div>';
+  }
+  const basics = Object.keys(GEMS).filter(function(g){ return GEMS[g].tier === 'basic'; });
+  const mids = Object.keys(GEMS).filter(function(g){ return GEMS[g].tier === 'mid'; });
+
   const html = '<h4>' + sk.name + ' · 词条槽 ' + (idx+1) + '</h4>' +
     '<div class="od" style="color:#5a6b80;font-size:11px;margin-bottom:10px">' +
-    '每个词条都有代价，绿字是增益，红字是代价</div>' +
-    Object.keys(GEMS).map(function(g){
-      const G = GEMS[g];
-      const sel = cur === g;
-      return '<div class="opt ' + (sel ? 'sel' : '') + '" onclick="setGem(\'' + skillId + '\',' + idx + ',\'' + g + '\')">' +
-        '<div class="oi">' + G.icon + '</div>' +
-        '<div class="ot">' + G.name +
-          '<div class="od"><span style="color:#a7e3bd">' + G.gain + '</span> / ' +
-          '<span style="color:#e0a0a0">' + G.cost + '</span></div></div>' +
-        (sel ? '<div class="od" style="color:#c4a5ff">已装备</div>' : '') + '</div>';
-    }).join('') +
+    '绿字是增益，红字是代价。初级代价小，中级更猛也更伤。</div>' +
+    '<h4>初级词条</h4>' + basics.map(gemRow).join('') +
+    '<h4 style="margin-top:10px">中级词条</h4>' + mids.map(gemRow).join('') +
     '<div class="opt" onclick="setGem(\'' + skillId + '\',' + idx + ',null)"><div class="oi">✕</div>' +
     '<div class="ot">取下词条</div></div>' +
     '<button class="close" onclick="closePicker()">完成</button>';
