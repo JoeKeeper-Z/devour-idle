@@ -568,17 +568,22 @@ function derived(){
   const lvMulE = 1 + 0.012*(S.lv-1);
   const rm = REALMS[realmOf(S.lv)].mul;
   const rift = Math.pow(CFG.riftGrow, Math.max(0, S.bestFloor));
-  const total = rm * rift;
+  // 攻击力只由「精华买的属性 × 裂隙共鸣」决定（共鸣与怪物成长同步，不额外放大）
+  const atk = Math.round(S.atk * rift);
+  // 技能伤害额外吃「等级 × 境界」——战术线独立成长
+  const skillAtk = Math.round(atk * lvMulA * rm);
   return {
-    atk: Math.round(S.atk * lvMulA * total),
-    hpMax: Math.round(S.hpMax * lvMulA * total),
+    atk: atk,
+    skillAtk: skillAtk,
+    hpMax: Math.round(S.hpMax * rift * lvMulA),
     crit: S.crit,
     critDmg: has('rend') ? 1.8 : 1.5,
     atkInterval: Math.max(CFG.minInterval, 900 * Math.pow(0.92, S.spdLv)),
-    essMul: lvMulE * total,
-    atkMul: lvMulA * total,
+    essMul: lvMulE * rm * rift,
+    atkMul: rift,
     realmMul: rm,
     riftMul: rift,
+    skillMul: lvMulA * rm,
   };
 }
 
@@ -936,8 +941,10 @@ function gemEssBonus(){
 // 统一出伤：暴击、裂伤易伤、分裂、附毒/附裂伤
 function hit(base, tag, m){
   const D = derived();
+  // base 传的是「攻击力倍数」，这里换成技能攻击基数（等级×境界只作用于技能）
+  const scale = D.skillAtk / Math.max(1, D.atk);
   const segs = m.split ? 2 : 1;
-  const per = (m.split ? base*0.5 : base) * m.dmg;
+  const per = (m.split ? base*0.5 : base) * m.dmg * scale;
   for(let i=0;i<segs;i++){
     if(R.monHp <= 0) break;
     const crit = Math.random()*100 < (D.crit + m.critAdd);
